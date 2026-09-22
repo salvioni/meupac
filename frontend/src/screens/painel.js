@@ -60,9 +60,9 @@ export function renderPainel() {
     <div><h1 class="text-[26px] font-bold text-on-surface leading-tight">Painel do Gerente</h1><p class="text-[13px] text-on-surface-variant">Acompanhe conformidades, alertas e assinaturas em tempo real.</p></div>
     <div class="grid grid-cols-2 gap-3">
       ${stat('bg-nc-bg', 'text-nc-tx', nc.length, 'Não Conformes', 'warning')}
-      ${stat('bg-surface-container-high', 'text-primary', toSign.length, 'Aguardando assinatura', 'draw')}
+      ${stat('bg-surface-container-high', 'text-primary', toSign.length, 'A Assinar', 'draw')}
       ${stat('bg-conf-bg', 'text-conf-tx', signed.length, 'Conformes OK', 'verified')}
-      ${stat('bg-surface-container-high', 'text-primary', awaiting.length, 'Aguardando preenchimento', 'pending_actions')}
+      ${stat('bg-surface-container-high', 'text-primary', awaiting.length, 'A Preencher', 'pending_actions')}
     </div>
     ${nc.length ? `<div>${secHead('Não Conformidades', nc.length)}<div class="space-y-2">${ncCards}</div></div>` : (anyToday ? `<div class="bg-conf-bg/60 rounded-xl p-4 flex items-center gap-2 text-conf-tx">${icon('task_alt', '', true)}<span class="text-[13px] font-semibold">Tudo em conformidade.</span></div>` : '')}
     ${toSign.length ? `<div>${secHead('Aguardando Assinatura', toSign.length)}
