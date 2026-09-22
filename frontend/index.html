@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="color-scheme" content="light">
+<title>meuPAC — Programas de Autocontrole</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Unbounded:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=block" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      surface:'#f8f9ff','surface-dim':'#d0dbed','surface-bright':'#f8f9ff',
+      'surface-container-lowest':'#ffffff','surface-container-low':'#eff4ff','surface-container':'#e5eeff',
+      'surface-container-high':'#dfe9fb','surface-container-highest':'#d9e3f5',
+      'on-surface':'#121c29','on-surface-variant':'#44474d','inverse-surface':'#27313f','inverse-on-surface':'#eaf1ff',
+      outline:'#74777e','outline-variant':'#c4c6ce','surface-tint':'#4b5f7e',
+      primary:'#0f2642','on-primary':'#ffffff','primary-container':'#0f2642','on-primary-container':'#798eaf','inverse-primary':'#b2c8eb',
+      secondary:'#176b48','on-secondary':'#ffffff','secondary-container':'#a1f1c3','on-secondary-container':'#0d5537',
+      tertiary:'#8a4505','on-tertiary':'#ffffff','tertiary-container':'#fef3c7','on-tertiary-container':'#8a4505',
+      error:'#b91c1c','on-error':'#ffffff','error-container':'#fee2e2','on-error-container':'#991b1b',
+      background:'#f8f9ff','on-background':'#121c29','surface-variant':'#d9e3f5',
+      'conf-bg':'#e6f4ea','conf-tx':'#135237','conf-bd':'#1b6e4a',
+      'pend-bg':'#fef3c7','pend-tx':'#8a4505','pend-bd':'#b46514',
+      'nc-bg':'#fee2e2','nc-tx':'#991b1b','nc-bd':'#b91c1c',
+    },
+    borderRadius:{ DEFAULT:'0.25rem', sm:'0.125rem', md:'0.375rem', lg:'0.5rem', xl:'0.75rem', full:'9999px' },
+    fontFamily:{
+      sans:['Hanken Grotesk','ui-sans-serif','system-ui','sans-serif'],
+      mono:['JetBrains Mono','ui-monospace','monospace'],
+      brand:['Unbounded','Hanken Grotesk','sans-serif'],
+    },
+  }}
+}
+</script>
+<style>
+  :root{ color-scheme: light; }
+  html,body{margin:0;padding:0;background:#e9edf6;}
+  body{font-family:'Hanken Grotesk',sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior:none;}
+  *{box-sizing:border-box;}
+  .material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;vertical-align:middle;user-select:none;}
+  .ms-fill{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;}
+  ::-webkit-scrollbar{width:0;height:0;display:none;}
+  .scroll-area{-ms-overflow-style:none;scrollbar-width:none;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .tap{transition:transform .12s ease, background-color .15s ease, box-shadow .15s ease;}
+  .tap:active{transform:scale(.975);}
+  .screen-enter{animation:screenIn .28s cubic-bezier(.22,.61,.36,1);}
+  @keyframes screenIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .sheet-enter{animation:sheetIn .3s cubic-bezier(.22,.61,.36,1);}
+  @keyframes sheetIn{from{transform:translateY(100%)}to{transform:none}}
+  .fade-in{animation:fadeIn .2s ease;}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+  /* phone frame */
+  #frame{max-width:430px;margin:0 auto;height:100dvh;background:#f8f9ff;position:relative;box-shadow:0 0 0 1px rgba(15,38,66,.06);}
+  #app{height:100%;}
+  @media(min-width:520px){
+    body{padding:24px 0;}
+    #frame{height:calc(100dvh - 48px);border-radius:28px;overflow:hidden;box-shadow:0 24px 60px -20px rgba(15,38,66,.35),0 0 0 1px rgba(15,38,66,.08);}
+  }
+  input:focus,select:focus,textarea:focus{outline:none;}
+  .num-input::-webkit-outer-spin-button,.num-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  .num-input{-moz-appearance:textfield;}
+  .toggle{width:44px;height:26px;border-radius:999px;background:#c4c6ce;position:relative;transition:background .18s;flex:none;cursor:pointer;}
+  .toggle.on{background:#176b48;}
+  .toggle::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:999px;background:#fff;transition:transform .18s;box-shadow:0 1px 2px rgba(0,0,0,.3);}
+  .toggle.on::after{transform:translateX(18px);}
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="app"></div>
+</div>
+<div id="toast" style="position:fixed;left:0;right:0;bottom:96px;display:flex;justify-content:center;pointer-events:none;z-index:80;"></div>
+<div id="modal-root"></div>
+<script type="module" src="./src/app.js"></script>
+</body>
+</html>
