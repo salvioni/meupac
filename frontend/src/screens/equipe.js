@@ -52,38 +52,92 @@ export async function renderEquipe() {
   app().innerHTML = shell(inner, GE_NAV, 'ge_equipe', profileTrigger());
 }
 
+const inputCls = 'w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary';
+const pickCls = on => `tap flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold ${on ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'}`;
+
+// senha sugerida: fácil de ditar/anotar (sem 0/O, 1/l), 8 caracteres
+function suggestPassword() {
+  const abc = 'abcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({ length: 8 }, () => abc[Math.floor(Math.random() * abc.length)]).join('');
+}
+
 export function inviteSheet() {
+  const act = activeTurnos(unitTurnos());
+  window.__inv = { role: 'operador', turno: act.length > 1 ? undefined : null }; // undefined = ainda não escolheu
+  const turnoBtn = (v, label, sub) => `<button data-inv-turno="${v === null ? '' : v}" class="${pickCls(false)} flex-col !gap-0">${label}${sub ? `<span class="mono text-[10px] font-normal opacity-80">${sub}</span>` : ''}</button>`;
   $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-center justify-center p-4" data-close-modal>
     <div class="absolute inset-0 bg-black/40" data-close-modal></div>
-    <div class="relative bg-surface-container-lowest rounded-2xl w-full max-w-[380px] shadow-2xl p-4">
+    <div class="relative bg-surface-container-lowest rounded-2xl w-full max-w-[380px] max-h-[88dvh] overflow-y-auto scroll-area shadow-2xl p-4">
       <div class="flex items-center gap-3 pb-3 border-b border-outline-variant/40">
-        <div class="flex-1"><div class="font-semibold text-on-surface">Convidar colaborador</div><div class="text-[12px] text-on-surface-variant">Cria um acesso com senha temporária</div></div>
+        <div class="flex-1"><div class="font-semibold text-on-surface">Novo colaborador</div><div class="text-[12px] text-on-surface-variant">Crie o login e a senha para passar à pessoa</div></div>
         <button data-action="close-x" class="tap w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant">${icon('close', 'text-[20px]')}</button>
       </div>
       <div class="space-y-3 mt-3">
-        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Nome</label><input id="inv-name" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
-        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Usuário (login)</label><input id="inv-user" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
-        <div class="flex gap-2">
-          <button data-inv-role="operador" class="inv-role-btn tap flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold bg-primary text-on-primary">${icon('engineering', 'text-[18px]')} Operador</button>
-          ${currentUser.titular ? `<button data-inv-role="gerente" class="inv-role-btn tap flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold bg-surface-container text-on-surface-variant">${icon('shield_person', 'text-[18px]')} Gestor</button>` : ''}
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Nome</label><input id="inv-name" class="${inputCls}"></div>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Usuário (login)</label><input id="inv-user" autocapitalize="none" autocomplete="off" class="${inputCls}"></div>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Senha</label>
+          <div class="flex gap-2 mt-1">
+            <input id="inv-pass" type="text" autocomplete="off" autocapitalize="none" placeholder="mínimo 6 caracteres" class="${inputCls} !mt-0 mono">
+            <button id="inv-gen" class="tap flex-none px-3 rounded-lg bg-surface-container text-primary text-[12px] font-semibold">Gerar</button>
+          </div>
         </div>
-        ${currentUser.titular ? '' : `<p class="text-[11px] text-on-surface-variant">Somente o titular pode criar contas de gestor.</p>`}
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Função</label>
+          <div class="flex gap-2 mt-1">
+            <button data-inv-role="operador" class="${pickCls(true)}">${icon('engineering', 'text-[18px]')} Operador</button>
+            ${currentUser.titular ? `<button data-inv-role="gerente" class="${pickCls(false)}">${icon('shield_person', 'text-[18px]')} Gestor</button>` : ''}
+          </div>
+          ${currentUser.titular ? '' : `<p class="text-[11px] text-on-surface-variant mt-1">Somente o titular pode criar contas de gestor.</p>`}
+        </div>
+        ${act.length > 1 ? `<div id="inv-turno-wrap"><label class="mono text-[10px] uppercase text-on-surface-variant">Turno</label>
+          <div class="flex gap-2 mt-1">${act.map(x => turnoBtn(x.idx, `${x.idx + 1}º turno`, `${x.inicio}–${x.fim}`)).join('')}${turnoBtn(null, 'Ambos', '')}</div>
+        </div>` : ''}
       </div>
       <button data-action="invite-confirm" class="tap w-full mt-4 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px]">Criar acesso</button>
     </div></div>`;
-  window.__invRole = 'operador';
-  document.querySelectorAll('.inv-role-btn').forEach(b => b.onclick = () => { window.__invRole = b.dataset.invRole; document.querySelectorAll('.inv-role-btn').forEach(x => x.className = 'inv-role-btn tap flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold ' + (x.dataset.invRole === window.__invRole ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant')); });
+  const inv = window.__inv;
+  $('inv-gen').onclick = () => { $('inv-pass').value = suggestPassword(); };
+  document.querySelectorAll('[data-inv-role]').forEach(b => b.onclick = () => {
+    inv.role = b.dataset.invRole;
+    document.querySelectorAll('[data-inv-role]').forEach(x => x.className = pickCls(x.dataset.invRole === inv.role));
+    const tw = $('inv-turno-wrap'); if (tw) tw.classList.toggle('hidden', inv.role !== 'operador'); // gestor vê todos os turnos
+  });
+  document.querySelectorAll('[data-inv-turno]').forEach(b => b.onclick = () => {
+    inv.turno = b.dataset.invTurno === '' ? null : +b.dataset.invTurno;
+    document.querySelectorAll('[data-inv-turno]').forEach(x => x.className = pickCls((x.dataset.invTurno === '' ? null : +x.dataset.invTurno) === inv.turno) + ' flex-col !gap-0');
+  });
 }
 
 export async function confirmInvite() {
-  const name = $('inv-name').value.trim(), username = $('inv-user').value.trim();
+  const inv = window.__inv;
+  const name = $('inv-name').value.trim(), username = $('inv-user').value.trim().toLowerCase(), password = $('inv-pass').value.trim();
   if (!name || !username) { toast('Informe nome e usuário.', 'err'); return; }
+  if (password.length < 6) { toast('A senha precisa ter pelo menos 6 caracteres.', 'err'); return; }
+  if (inv.role === 'operador' && inv.turno === undefined) { toast('Escolha o turno do operador.', 'err'); return; }
   try {
-    const { tempPassword } = await api.inviteMember(name, username, window.__invRole);
-    closeModal();
-    toast(`Acesso criado. Senha temporária: ${tempPassword}`, 'info');
-    renderEquipe();
+    await api.inviteMember(name, username, inv.role, password, inv.role === 'operador' ? inv.turno : null);
+    await renderEquipe();
+    credentialsSheet(name, username, password);
   } catch (e) { toast(e.message || 'Não foi possível criar o acesso.', 'err'); }
+}
+
+// login e senha na tela até o gestor fechar — pra anotar/passar à pessoa com calma
+function credentialsSheet(name, username, password) {
+  const line = (label, v) => `<div class="flex items-center justify-between gap-3 py-2">
+      <span class="mono text-[10px] uppercase text-on-surface-variant">${label}</span><span class="mono text-[16px] font-bold text-on-surface select-all">${esc(v)}</span></div>`;
+  $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative bg-surface-container-lowest rounded-2xl w-full max-w-[360px] shadow-2xl p-5">
+      <div class="flex flex-col items-center text-center">${icon('check_circle', 'text-conf-tx text-[40px]', true)}
+        <div class="font-semibold text-on-surface mt-1">Acesso criado para ${esc(name)}</div>
+        <div class="text-[12px] text-on-surface-variant">Passe estes dados para a pessoa entrar no meuPAC.</div></div>
+      <div class="bg-surface-container-low rounded-xl px-4 py-1 mt-4 divide-y divide-outline-variant/40">${line('Usuário', username)}${line('Senha', password)}</div>
+      <button id="cred-copy" class="tap w-full mt-3 bg-surface-container text-primary rounded-xl py-3 font-semibold text-[14px] flex items-center justify-center gap-1.5">${icon('content_copy', 'text-[18px]')} Copiar login e senha</button>
+      <button data-action="close-x" class="tap w-full mt-2 bg-primary text-on-primary rounded-xl py-3 font-semibold text-[14px]">Pronto</button>
+    </div></div>`;
+  $('cred-copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(`meuPAC\nUsuário: ${username}\nSenha: ${password}`); toast('Copiado.'); }
+    catch (e) { toast('Não deu pra copiar — anote os dados na tela.', 'err'); }
+  };
 }
 
 export function editMemberSheet(id) {

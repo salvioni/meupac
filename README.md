@@ -94,8 +94,8 @@ Variáveis de ambiente (opcionais, ver `backend/.env.example`):
 | `mariana`| `meupac123` | Operador             |
 
 Troque essas senhas (menu do perfil → Alterar senha) antes de qualquer uso
-real. Novos colaboradores são criados pela tela Equipe → Convidar, que gera
-uma senha temporária.
+real. Novos colaboradores são criados pela tela Equipe → Convidar: o gestor
+define login, senha e (para operadores) o turno, e passa os dados à pessoa.
 
 ## Principais funcionalidades
 

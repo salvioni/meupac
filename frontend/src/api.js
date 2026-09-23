@@ -106,8 +106,8 @@ export async function deleteForm(id) {
   return request(`/forms/${id}`, { method: 'DELETE' });
 }
 
-export async function inviteMember(name, username, role) {
-  return request('/team', { method: 'POST', body: { name, username, role } });
+export async function inviteMember(name, username, role, password, turnoIdx = null) {
+  return request('/team', { method: 'POST', body: { name, username, role, password, turnoIdx } });
 }
 export async function updateMember(id, role, ownedFormIds, turnoIdx = null) {
   const data = await request(`/team/${id}`, { method: 'PUT', body: { role, ownedFormIds, turnoIdx } });

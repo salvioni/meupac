@@ -30,8 +30,10 @@ teamRouter.get('/', authenticate, requireRole('gerente'), (req, res) => {
 });
 
 teamRouter.post('/', authenticate, requireRole('gerente'), (req, res) => {
-  const { name, username, role } = req.body || {};
+  const { name, username, role, password, turnoIdx } = req.body || {};
   if (!name || !username) return res.status(400).json({ error: 'Informe nome e usuário.' });
+  // a senha é definida por quem cria o acesso (pra passar à pessoa); mesma regra do cadastro
+  if (!password || String(password).length < 6) return res.status(400).json({ error: 'A senha precisa ter pelo menos 6 caracteres.' });
   const wantsGerente = role === 'gerente';
   // só o titular cria outros gestores — um gestor comum criando outro seria
   // escalação de privilégio (o próprio canManage já proíbe isso pra contas existentes)
@@ -43,11 +45,11 @@ teamRouter.post('/', authenticate, requireRole('gerente'), (req, res) => {
     return res.status(409).json({ error: 'Já existe um usuário com esse login.' });
   }
   const id = 'u' + Date.now() + Math.random().toString(36).slice(2, 6);
-  const tempPassword = Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 4).toUpperCase();
   const initials = name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-  db.prepare(`INSERT INTO users (id,unidade_id,name,username,password_hash,role,titular,initials,color,ink,active) VALUES (?,?,?,?,?,?,0,?,?,?,1)`)
-    .run(id, req.user.unidade_id, name.trim(), uname, bcrypt.hashSync(tempPassword, 10), wantsGerente ? 'gerente' : 'operador', initials, '#dfe9fb', '#0f2642');
-  res.status(201).json({ member: teamMemberOut(db.prepare('SELECT * FROM users WHERE id = ?').get(id)), tempPassword });
+  const turno = !wantsGerente && (turnoIdx === 0 || turnoIdx === 1) ? turnoIdx : null; // null = ambos
+  db.prepare(`INSERT INTO users (id,unidade_id,name,username,password_hash,role,titular,initials,color,ink,active,turno_idx) VALUES (?,?,?,?,?,?,0,?,?,?,1,?)`)
+    .run(id, req.user.unidade_id, name.trim(), uname, bcrypt.hashSync(String(password), 10), wantsGerente ? 'gerente' : 'operador', initials, '#dfe9fb', '#0f2642', turno);
+  res.status(201).json({ member: teamMemberOut(db.prepare('SELECT * FROM users WHERE id = ?').get(id)) });
 });
 
 teamRouter.put('/:id', authenticate, requireRole('gerente'), (req, res) => {
