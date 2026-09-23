@@ -48,16 +48,15 @@ export function renderFormEditor() {
         <div class="flex items-center gap-2">${icon('schedule', 'text-secondary text-[18px]', true)}<h2 class="mono text-[11px] uppercase tracking-widest text-on-surface font-semibold">Frequência & Coleta</h2></div>
         <span class="material-symbols-outlined text-on-surface-variant text-[20px]" data-chevron>expand_less</span>
       </button>
-      <div class="px-4 pb-4 space-y-3" data-section-body="freq">
+      <div class="px-4 pb-4" data-section-body="freq">
         <div id="ed-when-wrap"></div>
-        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Quem preenche</label>
-          <div class="grid grid-cols-2 gap-2 mt-1">
-            <button data-fill-mode="um" class="fill-mode-btn tap rounded-lg px-3 py-2 text-left"><div class="text-[13px] font-semibold">Basta um</div><div class="text-[11px] opacity-80">O primeiro envio conclui</div></button>
-            <button data-fill-mode="cada" class="fill-mode-btn tap rounded-lg px-3 py-2 text-left"><div class="text-[13px] font-semibold">Cada pessoa</div><div class="text-[11px] opacity-80">Todos com acesso enviam</div></button>
+        <div class="mt-4 pt-4 border-t border-outline-variant/40">${lbl('Quem preenche')}
+          <div class="grid grid-cols-2 gap-2">
+            <button data-fill-mode="um" class="fill-mode-btn tap rounded-lg px-3 py-2 text-left"><div class="text-[13px] font-semibold">Basta um</div><div class="text-[11px] opacity-80">Ex.: cloro, temperatura</div></button>
+            <button data-fill-mode="cada" class="fill-mode-btn tap rounded-lg px-3 py-2 text-left"><div class="text-[13px] font-semibold">Cada pessoa</div><div class="text-[11px] opacity-80">Ex.: saúde, uniforme</div></button>
           </div>
-          <p id="ed-fill-help" class="text-[11px] text-on-surface-variant mt-1"></p>
         </div>
-        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Local / Ponto de Coleta</label><input id="ed-loc" value="${editing ? esc(editing.location) : ''}" placeholder="Ex: Reservatório Central" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
+        <div class="mt-4 pt-4 border-t border-outline-variant/40">${lbl('Local / ponto de coleta')}<input id="ed-loc" value="${editing ? esc(editing.location) : ''}" placeholder="Ex: Reservatório Central" class="w-full bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
       </div>
     </section>
 
@@ -81,9 +80,6 @@ export function renderFormEditor() {
   window.__fillMode = editing && editing.fillMode === 'cada' ? 'cada' : 'um';
   const paintFill = () => {
     document.querySelectorAll('.fill-mode-btn').forEach(b => b.className = 'fill-mode-btn tap rounded-lg px-3 py-2 text-left ' + (b.dataset.fillMode === window.__fillMode ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'));
-    $('ed-fill-help').textContent = window.__fillMode === 'cada'
-      ? 'Para registros sobre a própria pessoa (ex.: autodeclaração de saúde, uniforme). O horário só se completa quando todos os operadores com acesso, do turno, enviarem.'
-      : 'Para registros do processo ou do local (ex.: cloro, temperatura). Quem mais tiver acesso serve de cobertura.';
   };
   document.querySelectorAll('.fill-mode-btn').forEach(b => b.onclick = () => { window.__fillMode = b.dataset.fillMode; paintFill(); });
   paintFill();
@@ -98,51 +94,58 @@ export function renderFormEditor() {
   });
 }
 
+// rótulo de bloco (mesmo estilo em toda a seção) e divisória entre blocos
+const lbl = (t, right = '') => `<div class="flex items-center justify-between min-h-[20px] mb-2"><span class="mono text-[10px] uppercase tracking-wide text-on-surface-variant">${t}</span>${right}</div>`;
+const group = inner => `<div class="mt-4 pt-4 border-t border-outline-variant/40">${inner}</div>`;
+const fieldCls = 'bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface border border-transparent focus:border-primary';
+
 export function renderWhen() {
   const wrap = $('ed-when-wrap'); if (!wrap) return;
   const w = window.__when;
-  const typeBtn = (v, label, ic) => `<button data-action="when-type" data-type="${v}" class="tap flex items-center justify-center gap-1 py-2 md:px-3 rounded-lg text-[12px] font-semibold ${w.type === v ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${icon(ic, 'text-[16px]')} ${label}</button>`;
-  let body = '';
+  // 5 tipos sempre numa linha: ícone em cima, nome embaixo
+  const typeBtn = (v, label, ic) => `<button data-action="when-type" data-type="${v}" class="tap flex flex-col items-center justify-center gap-0.5 py-2 rounded-lg text-[11px] font-semibold ${w.type === v ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${icon(ic, 'text-[18px]')}${label}</button>`;
+  const toggleRow = (id, on, text) => `<div class="flex items-center gap-3"><span id="${id}" class="toggle ${on ? 'on' : ''} flex-none cursor-pointer"></span><span class="text-[13px] text-on-surface">${text}</span></div>`;
+
+  let config = '';
   if (w.type === 'fixos') {
-    // "sem horário específico": 1 registro por dia, a qualquer hora, sem prazo/atraso
-    body = `<div class="flex items-center gap-3">
-        <span id="ed-notime" class="toggle ${w.noTime ? 'on' : ''} flex-none cursor-pointer"></span>
-        <span class="text-[13px] text-on-surface">Sem horário específico</span>
-      </div>
-      ${w.noTime ? `<p class="text-[11px] text-on-surface-variant mt-2">1 registro por dia, a qualquer hora — não fica atrasada.</p>` : `<div id="ed-times" class="flex flex-wrap gap-2 mt-3"></div>
-      ${toleranceBlock(w)}`}`;
+    config = toggleRow('ed-notime', w.noTime, 'Sem horário específico')
+      + (w.noTime ? '' : `<div id="ed-times" class="flex flex-wrap gap-2 mt-3"></div>`);
   } else if (w.type === 'intervalo') {
-    body = `<div class="flex items-center gap-2">
+    config = `<div class="flex items-center gap-2">
       <span class="text-[13px] text-on-surface">A cada</span>
-      <input id="ed-every" type="number" min="1" value="${w.every}" class="w-16 bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface text-center border border-transparent focus:border-primary">
-      <select id="ed-unit" class="bg-surface-container-low rounded-lg px-3 py-2 text-[13px] font-semibold text-on-surface border border-transparent focus:border-primary"><option value="horas" ${w.unit === 'horas' ? 'selected' : ''}>horas</option><option value="minutos" ${w.unit === 'minutos' ? 'selected' : ''}>minutos</option></select>
+      <input id="ed-every" type="number" min="1" value="${w.every}" class="w-16 text-center ${fieldCls}">
+      <select id="ed-unit" class="${fieldCls} !font-sans !text-[13px] font-semibold"><option value="horas" ${w.unit === 'horas' ? 'selected' : ''}>horas</option><option value="minutos" ${w.unit === 'minutos' ? 'selected' : ''}>minutos</option></select>
     </div>${windowBlock(w)}`;
   } else if (w.type === 'vezes') {
-    body = `<div class="flex items-center gap-2 flex-wrap">
-      <input id="ed-count" type="number" min="1" value="${w.count}" class="w-16 bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface text-center border border-transparent focus:border-primary">
+    config = `<div class="flex items-center gap-2 flex-wrap">
+      <input id="ed-count" type="number" min="1" value="${w.count}" class="w-16 text-center ${fieldCls}">
       <span class="text-[13px] text-on-surface">vez(es) por</span>
-      <select id="ed-period" class="bg-surface-container-low rounded-lg px-3 py-2 text-[13px] font-semibold text-on-surface border border-transparent focus:border-primary"><option value="dia" ${w.period === 'dia' ? 'selected' : ''}>dia</option><option value="semana" ${w.period === 'semana' ? 'selected' : ''}>semana</option><option value="mes" ${w.period === 'mes' ? 'selected' : ''}>mês</option></select>
-    </div>${w.period === 'dia' ? windowBlock(w) : `<p class="text-[11px] text-on-surface-variant mt-2">Quantidade sem horário fixo — 1 registro por dia, sem prazo.</p>`}`;
+      <select id="ed-period" class="${fieldCls} !font-sans !text-[13px] font-semibold"><option value="dia" ${w.period === 'dia' ? 'selected' : ''}>dia</option><option value="semana" ${w.period === 'semana' ? 'selected' : ''}>semana</option><option value="mes" ${w.period === 'mes' ? 'selected' : ''}>mês</option></select>
+    </div>${w.period === 'dia' ? windowBlock(w) : ''}`;
   } else if (w.type === 'momentos') {
-    const mo = (v, label) => { const on = w.moments.has(v); return `<button data-action="when-moment" data-m="${v}" class="tap w-full flex items-center justify-between px-3 py-2.5 rounded-lg ${on ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-low text-on-surface'}"><span class="text-[13px] font-medium">${label}</span><span class="material-symbols-outlined ${on ? 'ms-fill text-secondary' : 'text-outline-variant'} text-[20px]">${on ? 'check_circle' : 'radio_button_unchecked'}</span></button>`; };
     const act = activeTurnos(unitTurnos()), multi = act.length > 1;
-    const chip = t => { const on = w.turnos.has(t.idx); return `<button data-when-turno="${t.idx}" class="tap flex-1 px-3 py-2 rounded-lg text-[12px] font-semibold ${on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${t.idx + 1}º turno <span class="mono font-normal opacity-80">${t.inicio}–${t.fim}</span></button>`; };
-    body = `<div class="space-y-2">${mo('inicio', multi ? 'Início do turno' : 'Início do expediente')}${mo('fim', multi ? 'Fim do turno' : 'Fim do expediente')}</div>
-      ${multi ? `<label class="mono text-[10px] uppercase text-on-surface-variant block mt-3">Em quais turnos</label><div class="flex gap-2 mt-1">${act.map(chip).join('')}</div>` : ''}
-      ${toleranceBlock(w)}
-      <p id="ed-slot-preview" class="text-[11px] text-on-surface-variant mt-2"></p>`;
+    const mo = (v, label) => { const on = w.moments.has(v); return `<button data-action="when-moment" data-m="${v}" class="tap flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold ${on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${icon(on ? 'check_circle' : 'radio_button_unchecked', 'text-[18px]')}${label}</button>`; };
+    const chip = t => { const on = w.turnos.has(t.idx); return `<button data-when-turno="${t.idx}" class="tap flex-1 flex flex-col items-center py-2 rounded-lg text-[12px] font-semibold ${on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${t.idx + 1}º turno<span class="mono text-[10px] font-normal opacity-80">${t.inicio}–${t.fim}</span></button>`; };
+    config = `<div class="flex gap-2">${mo('inicio', multi ? 'Início do turno' : 'Início do expediente')}${mo('fim', multi ? 'Fim do turno' : 'Fim do expediente')}</div>
+      ${multi ? `<div class="flex gap-2 mt-2">${act.map(chip).join('')}</div>` : ''}`;
   } else {
-    body = `<div class="flex items-start gap-2 bg-surface-container-low rounded-lg p-3 text-[12px] text-on-surface-variant">${icon('bolt', 'text-[18px] flex-none')}<span>Sem horário nem dia específico.</span></div>`;
+    config = `<div class="flex items-center gap-2 bg-surface-container-low rounded-lg p-3 text-[12px] text-on-surface-variant">${icon('bolt', 'text-[18px] flex-none')}<span>Sem horário nem dia específico.</span></div>`;
   }
-  const daysBlock = w.type === 'demanda' ? '' : `<div class="mt-4"><label class="mono text-[10px] uppercase text-on-surface-variant">Dias</label>
-    <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-      <button data-when-alldays class="ad-btn tap text-[12px] font-semibold px-3 py-1.5 rounded-lg">Todos os dias</button>
-      <span class="w-px h-6 bg-outline-variant/50 mx-0.5"></span>
-      ${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => `<button data-when-day="${i}" class="wday-btn tap w-8 h-8 rounded-lg font-semibold text-[13px]">${d}</button>`).join('')}
-    </div></div>`;
-  wrap.innerHTML = `<label class="mono text-[10px] uppercase text-on-surface-variant">Quando preencher</label>
-    <div class="grid grid-cols-3 gap-2 mt-1 md:flex md:flex-wrap">${typeBtn('fixos', 'Fixos', 'schedule')}${typeBtn('intervalo', 'A cada', 'timelapse')}${typeBtn('vezes', 'Vezes', 'repeat')}${typeBtn('momentos', 'Momentos', 'flag')}${typeBtn('demanda', 'Demanda', 'bolt')}</div>
-    <div class="mt-3">${body}</div>${daysBlock}`;
+
+  // horários gerados (a cada / vezes ao dia / momentos) e tolerância: só quando há horário
+  const generated = usesWindow(whenSchedule(w)) || w.type === 'momentos';
+  const hasTimes = generated || (w.type === 'fixos' && !w.noTime);
+  const horarios = generated ? group(lbl('Horários', `<span id="ed-slot-count" class="mono text-[10px] text-on-surface-variant"></span>`) + `<div id="ed-slot-preview" class="flex flex-wrap gap-1.5"></div>`) : '';
+  const tolerancia = hasTimes ? group(lbl('Tolerância') + `<div class="flex items-center gap-2">
+      <input id="ed-tolerance" type="number" min="0" value="${w.toleranceMin}" class="w-16 text-center ${fieldCls}">
+      <span class="text-[13px] text-on-surface">min até marcar como atrasada</span></div>`) : '';
+  const dias = w.type === 'demanda' ? '' : group(lbl('Dias', `<button data-when-alldays class="tap text-[12px] font-semibold text-primary px-2 py-0.5 rounded">Todos</button>`)
+    + `<div class="grid grid-cols-7 gap-1.5">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => `<button data-when-day="${i}" class="wday-btn tap h-9 rounded-lg font-semibold text-[13px]">${d}</button>`).join('')}</div>`);
+
+  wrap.innerHTML = lbl('Quando preencher')
+    + `<div class="grid grid-cols-5 gap-1.5">${typeBtn('fixos', 'Fixos', 'schedule')}${typeBtn('intervalo', 'A cada', 'timelapse')}${typeBtn('vezes', 'Vezes', 'repeat')}${typeBtn('momentos', 'Momentos', 'flag')}${typeBtn('demanda', 'Demanda', 'bolt')}</div>
+    <div class="mt-3">${config}</div>${horarios}${tolerancia}${dias}`;
+
   if (w.type === 'fixos' && !w.noTime) renderEditorTimes();
   const nt = $('ed-notime'); if (nt) nt.onclick = () => { syncWhen(); w.noTime = !w.noTime; renderWhen(); };
   ['ed-unit', 'ed-period'].forEach(id => { const el = $(id); if (el) el.onchange = () => { syncWhen(); renderWhen(); }; });
@@ -154,13 +157,23 @@ export function renderWhen() {
   const ue = $('ed-useexp'); if (ue) ue.onclick = () => { syncWhen(); w.useExp = !w.useExp; if (w.useExp) { const e = expediente(unitTurnos()); w.start = e.start; w.end = e.end; } renderWhen(); };
   ['ed-every', 'ed-count', 'ed-start', 'ed-end'].forEach(id => { const el = $(id); if (el) el.oninput = () => { syncWhen(); paintSlotPreview(); }; });
   paintSlotPreview();
+
+  // dias: lista vazia = todos. Na tela, "todos" aparece com os 7 marcados; desmarcar um
+  // deixa os outros 6. Não dá pra desmarcar o último (sem dia nenhum não faz sentido).
   function paintDays() {
     const all = w.days.length === 0;
-    document.querySelectorAll('.ad-btn').forEach(b => b.className = 'ad-btn tap text-[12px] font-semibold px-3 py-1.5 rounded-lg ' + (all ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'));
-    document.querySelectorAll('.wday-btn').forEach(b => { const i = +b.dataset.whenDay; const on = !all && w.days.includes(i); b.className = 'wday-btn tap w-8 h-8 rounded-lg font-semibold text-[13px] ' + (on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'); });
+    document.querySelectorAll('.wday-btn').forEach(b => { const i = +b.dataset.whenDay; const on = all || w.days.includes(i); b.className = 'wday-btn tap h-9 rounded-lg font-semibold text-[13px] ' + (on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'); });
+    const ad = document.querySelector('[data-when-alldays]'); if (ad) ad.classList.toggle('invisible', all);
   }
-  document.querySelectorAll('.ad-btn').forEach(b => b.onclick = () => { w.days = []; paintDays(); });
-  document.querySelectorAll('.wday-btn').forEach(b => b.onclick = () => { const i = +b.dataset.whenDay; const k = w.days.indexOf(i); if (k >= 0) w.days.splice(k, 1); else w.days.push(i); paintDays(); });
+  const ad = document.querySelector('[data-when-alldays]'); if (ad) ad.onclick = () => { w.days = []; paintDays(); };
+  document.querySelectorAll('.wday-btn').forEach(b => b.onclick = () => {
+    const i = +b.dataset.whenDay;
+    const cur = w.days.length ? w.days.slice() : [0, 1, 2, 3, 4, 5, 6];
+    const k = cur.indexOf(i);
+    if (k >= 0) { if (cur.length === 1) return; cur.splice(k, 1); } else cur.push(i);
+    w.days = cur.length === 7 ? [] : cur;
+    paintDays();
+  });
   paintDays();
 }
 
@@ -175,14 +188,6 @@ export function syncWhen() {
   if (tol) w.toleranceMin = Math.max(0, parseInt(tol.value, 10) || 0);
 }
 
-function toleranceBlock(w) {
-  return `<div class="flex items-center gap-2 mt-3">
-        <span class="text-[13px] text-on-surface">Tolerância de</span>
-        <input id="ed-tolerance" type="number" min="0" value="${w.toleranceMin}" class="w-16 bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface text-center border border-transparent focus:border-primary">
-        <span class="text-[13px] text-on-surface">minutos antes de marcar como atrasada</span>
-      </div>`;
-}
-
 // janela do dia (início/fim) pra "a cada X horas" e "N vezes ao dia": é o que transforma
 // a frequência em horários concretos, cada um com seu próprio registro.
 function windowBlock(w) {
@@ -195,9 +200,7 @@ function windowBlock(w) {
     ${w.useExp ? '' : `<div class="flex items-center gap-2 mt-3 flex-wrap">
       <span class="text-[13px] text-on-surface">Das</span>${inp('ed-start', w.start)}
       <span class="text-[13px] text-on-surface">às</span>${inp('ed-end', w.end)}
-    </div>`}
-    ${toleranceBlock(w)}
-    <p id="ed-slot-preview" class="text-[11px] text-on-surface-variant mt-2"></p>`;
+    </div>`}`;
 }
 
 // sem start/end = segue o expediente da unidade (muda junto se os turnos mudarem)
@@ -211,17 +214,17 @@ function whenSchedule(w) {
 
 function paintSlotPreview() {
   const el = $('ed-slot-preview'); if (!el) return;
+  const cnt = $('ed-slot-count');
   const w = window.__when;
-  if (w.type !== 'momentos' && !w.useExp && !(toMin(w.end) > toMin(w.start))) { el.innerHTML = `<span class="text-error font-semibold">O fim precisa ser depois do início.</span>`; return; }
+  if (w.type !== 'momentos' && !w.useExp && !(toMin(w.end) > toMin(w.start))) {
+    el.innerHTML = `<span class="text-[12px] text-error font-semibold">O fim precisa ser depois do início.</span>`; if (cnt) cnt.textContent = ''; return;
+  }
   const sch = whenSchedule(w);
   const slots = daySlots(sch, [], '', unitTurnos());
-  if (w.type === 'momentos') {
-    const labels = slotLabels(sch, [], '', unitTurnos());
-    el.textContent = slots.map(t => `${labels[t]} (${t})`).join(' · ');
-    return;
-  }
-  const shown = slots.length > 12 ? slots.slice(0, 12).join(', ') + ', …' : slots.join(', ');
-  el.textContent = `${slots.length} registro${slots.length === 1 ? '' : 's'} por dia: ${shown}`;
+  const labels = w.type === 'momentos' ? slotLabels(sch, [], '', unitTurnos()) : {};
+  const chip = t => `<span class="inline-flex items-center gap-1 bg-surface-container-low rounded-md px-2 py-1 text-[12px] text-on-surface">${labels[t] ? `<span>${esc(labels[t])}</span>·` : ''}<span class="mono font-semibold">${t}</span></span>`;
+  el.innerHTML = slots.map(chip).join('');
+  if (cnt) cnt.textContent = slots.length ? `${slots.length} por dia` : '';
 }
 
 function timeSelect(kind, val, i) {
