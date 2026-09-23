@@ -108,6 +108,7 @@ export function dueText(f) {
     else if (s.type === 'vezes' && s.count) when = `${s.count}x ${s.period === 'semana' ? 'por semana' : s.period === 'mes' ? 'ao mês' : 'ao dia'}${win}`;
     else if (s.type === 'momentos' && s.moments && s.moments.length) when = momentsText(s, unitTurnos());
     else if (s.type === 'demanda') return 'Sob demanda';
+    else if (s.type === 'fixos' && s.semHorario) when = '1x ao dia, sem horário';
     else if (s.type === 'fixos' && s.times && s.times.length) when = 'às ' + s.times.join(', ');
     if (when) return when + ' · ' + daysLabel(s.days);
   }

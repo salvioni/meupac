@@ -290,7 +290,6 @@ function turnosCard(team) {
   const act = activeTurnos(unitTurnos());
   const ops = team.filter(t => t.role === 'operador');
   const count = idx => ops.filter(t => t.turnoIdx === idx).length;
-  const ambos = act.length > 1 ? ops.filter(t => !act.some(x => x.idx === t.turnoIdx)).length : 0;
   const row = x => `<div class="flex items-center justify-between py-1.5">
       <span class="text-[13px] font-semibold text-on-surface">${act.length > 1 ? `${x.idx + 1}º turno` : 'Expediente'} <span class="mono font-normal text-on-surface-variant">${x.inicio}–${x.fim}</span></span>
       ${act.length > 1 ? `<span class="text-[11px] text-on-surface-variant">${count(x.idx)} operador${count(x.idx) !== 1 ? 'es' : ''}</span>` : ''}
@@ -301,7 +300,6 @@ function turnosCard(team) {
       <button data-action="edit-turnos" class="tap text-[12px] font-semibold text-primary px-2 py-1 rounded-lg">Editar</button>
     </div>
     ${act.map(row).join('')}
-    ${ambos ? `<div class="text-[11px] text-on-surface-variant pt-1">${ambos} operador${ambos !== 1 ? 'es' : ''} em ambos os turnos</div>` : ''}
   </div>`;
 }
 

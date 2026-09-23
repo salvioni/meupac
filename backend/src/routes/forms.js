@@ -14,7 +14,7 @@ function validatePayload(body) {
   const { title, location, schedule, days, times, due, params } = body || {};
   if (!title || !String(title).trim()) return 'Informe o título do documento.';
   if (!Array.isArray(params) || !params.length || params.some(p => !p.name || !String(p.name).trim())) return 'Todo parâmetro precisa de um nome.';
-  if (schedule && schedule.type === 'fixos' && (!times || !times.length)) return 'Adicione ao menos um horário.';
+  if (schedule && schedule.type === 'fixos' && !schedule.semHorario && (!times || !times.length)) return 'Adicione ao menos um horário.';
   if (schedule && schedule.type === 'momentos' && (!schedule.moments || !schedule.moments.length)) return 'Selecione ao menos um momento.';
   return null;
 }

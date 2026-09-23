@@ -17,8 +17,8 @@ export function renderFormEditor() {
   const es = (editing && editing.schedule) || {};
   const turnoIdx = activeTurnos(unitTurnos()).slice(0, 1).map(t => t.idx); // padrão: só o 1º turno
   window.__when = editing && editing.schedule
-    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), start: es.start || exp.start, end: es.end || exp.end, useExp: !(es.start || es.end), turnos: new Set(es.turnos && es.turnos.length ? es.turnos : turnoIdx), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
-    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), start: exp.start, end: exp.end, useExp: true, turnos: new Set(turnoIdx), days: [], toleranceMin: 0 };
+    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), noTime: !!es.semHorario || (es.type === 'fixos' && !(es.times && es.times.length) && !(editing.times && editing.times.length) && !editing.due), start: es.start || exp.start, end: es.end || exp.end, useExp: !(es.start || es.end), turnos: new Set(es.turnos && es.turnos.length ? es.turnos : turnoIdx), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
+    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), noTime: false, start: exp.start, end: exp.end, useExp: true, turnos: new Set(turnoIdx), days: [], toleranceMin: 0 };
 
   const inner = `<div class="px-4 py-4 space-y-4 pb-8">
     <div class="flex items-center justify-between">
@@ -88,9 +88,14 @@ export function renderWhen() {
   const typeBtn = (v, label, ic) => `<button data-action="when-type" data-type="${v}" class="tap flex items-center justify-center gap-1 py-2 rounded-lg text-[12px] font-semibold ${w.type === v ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${icon(ic, 'text-[16px]')} ${label}</button>`;
   let body = '';
   if (w.type === 'fixos') {
-    body = `<div id="ed-times" class="flex flex-wrap gap-2"></div>
+    // "sem horário específico": 1 registro por dia, a qualquer hora, sem prazo/atraso
+    body = `<div class="flex items-center gap-3">
+        <span id="ed-notime" class="toggle ${w.noTime ? 'on' : ''} flex-none cursor-pointer"></span>
+        <span class="text-[13px] text-on-surface">Sem horário específico</span>
+      </div>
+      ${w.noTime ? `<p class="text-[11px] text-on-surface-variant mt-2">1 registro por dia, a qualquer hora — não fica atrasada.</p>` : `<div id="ed-times" class="flex flex-wrap gap-2 mt-3"></div>
       <button data-action="add-time" class="tap mt-2 inline-flex items-center gap-1 text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} Adicionar horário</button>
-      ${toleranceBlock(w)}`;
+      ${toleranceBlock(w)}`}`;
   } else if (w.type === 'intervalo') {
     body = `<div class="flex items-center gap-2">
       <span class="text-[13px] text-on-surface">A cada</span>
@@ -124,7 +129,8 @@ export function renderWhen() {
   wrap.innerHTML = `<label class="mono text-[10px] uppercase text-on-surface-variant">Quando preencher</label>
     <div class="grid grid-cols-3 gap-2 mt-1">${typeBtn('fixos', 'Fixos', 'schedule')}${typeBtn('intervalo', 'A cada', 'timelapse')}${typeBtn('vezes', 'Vezes', 'repeat')}${typeBtn('momentos', 'Momentos', 'flag')}${typeBtn('demanda', 'Demanda', 'bolt')}</div>
     <div class="mt-3">${body}</div>${daysBlock}`;
-  if (w.type === 'fixos') renderEditorTimes();
+  if (w.type === 'fixos' && !w.noTime) renderEditorTimes();
+  const nt = $('ed-notime'); if (nt) nt.onclick = () => { syncWhen(); w.noTime = !w.noTime; renderWhen(); };
   ['ed-unit', 'ed-period'].forEach(id => { const el = $(id); if (el) el.onchange = () => { syncWhen(); renderWhen(); }; });
   document.querySelectorAll('[data-when-turno]').forEach(b => b.onclick = () => {
     syncWhen(); const i = +b.dataset.whenTurno;
@@ -452,7 +458,8 @@ export async function saveFormEditor() {
   const w = window.__when;
   const days = (w.days || []).slice().sort();
   let times = [], due = '', schedule;
-  if (w.type === 'fixos') { times = window.__editorTimes.filter(Boolean).sort(); if (!times.length) { toast('Adicione ao menos um horário.', 'err'); return; } due = times[0] || ''; schedule = { type: 'fixos', times, days }; }
+  if (w.type === 'fixos' && w.noTime) { schedule = { type: 'fixos', times: [], semHorario: true, days }; }
+  else if (w.type === 'fixos') { times = window.__editorTimes.filter(Boolean).sort(); if (!times.length) { toast('Adicione ao menos um horário.', 'err'); return; } due = times[0] || ''; schedule = { type: 'fixos', times, days }; }
   else if (w.type === 'intervalo' || w.type === 'vezes') {
     schedule = { ...whenSchedule(w), days };
     if (usesWindow(schedule) && !w.useExp && !(toMin(w.end) > toMin(w.start))) { toast('O horário de fim precisa ser depois do início.', 'err'); return; }
@@ -463,7 +470,7 @@ export async function saveFormEditor() {
   const editing = params.form ? getForm(params.form) : null;
   const loc = $('ed-loc').value.trim() || 'A definir';
   const pac = editing ? getPac(editing.pacId) : getPac(params.pac || DB.pacs[0].id);
-  const toleranceMin = (w.type === 'fixos' || w.type === 'momentos' || usesWindow(schedule)) ? (w.toleranceMin || 0) : 0;
+  const toleranceMin = ((w.type === 'fixos' && !w.noTime) || w.type === 'momentos' || usesWindow(schedule)) ? (w.toleranceMin || 0) : 0;
   const payload = { pacId: pac.id, title, due, schedule, days, times, location: loc, params: window.__editorParams, toleranceMin };
 
   const btn = document.querySelector('[data-action="save-form"]');
