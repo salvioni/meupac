@@ -115,8 +115,7 @@ export function renderWhen() {
     body = `<div class="space-y-2">${mo('inicio', multi ? 'Início do turno' : 'Início do expediente')}${mo('fim', multi ? 'Fim do turno' : 'Fim do expediente')}</div>
       ${multi ? `<label class="mono text-[10px] uppercase text-on-surface-variant block mt-3">Em quais turnos</label><div class="flex gap-2 mt-1">${act.map(chip).join('')}</div>` : ''}
       ${toleranceBlock(w)}
-      <p id="ed-slot-preview" class="text-[11px] text-on-surface-variant mt-2"></p>
-      <p class="text-[11px] text-on-surface-variant mt-1">Os horários dos turnos ficam na tela Equipe.</p>`;
+      <p id="ed-slot-preview" class="text-[11px] text-on-surface-variant mt-2"></p>`;
   } else {
     body = `<div class="flex items-start gap-2 bg-surface-container-low rounded-lg p-3 text-[12px] text-on-surface-variant">${icon('bolt', 'text-[18px] flex-none')}<span>Sem horário específico — preenchida quando houver demanda.</span></div>`;
   }
@@ -203,7 +202,7 @@ function paintSlotPreview() {
   const slots = daySlots(sch, [], '', unitTurnos());
   if (w.type === 'momentos') {
     const labels = slotLabels(sch, [], '', unitTurnos());
-    el.textContent = slots.length ? slots.map(t => `${labels[t]} (${t})`).join(' · ') : 'Selecione início e/ou fim.';
+    el.textContent = slots.map(t => `${labels[t]} (${t})`).join(' · ');
     return;
   }
   const shown = slots.length > 12 ? slots.slice(0, 12).join(', ') + ', …' : slots.join(', ');
