@@ -27,7 +27,11 @@ export function renderOpPac() {
       if (sub) done.push({ f, slot: null, sub }); else if (activeToday(f)) todo.push({ f, slot: null, st: 'afazer', min: Infinity });
     }
   });
-  todo.sort((a, b) => (a.st === 'atrasado' ? 0 : 1) - (b.st === 'atrasado' ? 0 : 1) || a.min - b.min);
+  // ordem: início do expediente no topo (é o que se faz primeiro no dia), depois os
+  // atrasados, depois por horário. Planilhas sem horário (fim do expediente, demanda) vão pro fim.
+  const isInicio = f => !!(f.schedule && f.schedule.type === 'momentos' && (f.schedule.moments || []).includes('inicio'));
+  const rank = t => isInicio(t.f) ? 0 : t.st === 'atrasado' ? 1 : 2;
+  todo.sort((a, b) => rank(a) - rank(b) || a.min - b.min);
   done.sort((a, b) => new Date(b.sub.ts) - new Date(a.sub.ts));
 
   const freq = f => dueText(f).split(' · ')[0];
