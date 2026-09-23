@@ -27,6 +27,7 @@ export function navigate(s, p = {}, replace = false) {
   render();
   window.scrollTo(0, 0);
   const sc = $('screen-scroll'); if (sc) sc.scrollTop = 0;
+  if (screen !== s) return; // render redirecionou (tela não permitida) e já gravou a URL certa
   pushUrl(s, p, replace);
 }
 
@@ -63,6 +64,13 @@ export function render() {
   const frame = $('frame');
   if (!currentUser) { if (frame) frame.classList.add('web'); renderLogin(); return; }
   if (frame) frame.classList.remove('web');
+  // telas de gestor (ge_*) não abrem pra operador, nem digitando o endereço na mão;
+  // e as de preencher não abrem pra gestor. O servidor já recusa as ações — isso
+  // evita mostrar botões (ex.: editar turnos) que a pessoa não pode usar.
+  const isOp = currentUser.role === 'operador';
+  if ((isOp && screen.startsWith('ge_')) || (!isOp && (screen === 'op_pac' || screen === 'op_fill' || screen === 'op_hist'))) {
+    navigate(isOp ? 'op_pac' : 'ge_painel', {}, true); return;
+  }
   switch (screen) {
     case 'op_pac': renderOpPac(); break;
     case 'op_fill': renderPreencher(); break;
