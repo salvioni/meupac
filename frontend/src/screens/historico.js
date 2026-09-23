@@ -5,6 +5,8 @@ import { OP_NAV, GE_NAV } from '../config.js';
 import { exportReportPdf, exportHistCsv } from '../pdf.js';
 
 const app = () => $('app');
+const filtActiveCls = () => 'bg-primary text-on-primary';
+const filtInactiveCls = (k) => 'bg-surface-container-lowest border text-on-surface-variant ' + (k === 'ocorrencia' ? 'border-nc-bd/60' : k === 'assinar' ? 'border-outline' : 'border-outline-variant/60');
 
 export function renderOpHist() {
   const mine = DB.submissions.filter(s => s.operatorId === currentUser.id).sort((a, b) => new Date(b.ts) - new Date(a.ts));
@@ -25,9 +27,9 @@ function histBody(subs, title, sub, showOperators) {
       ${showOperators ? `<button data-action="open-export" class="tap flex-none flex items-center gap-1.5 bg-primary text-on-primary rounded-lg px-3 py-2 text-[12px] font-semibold mt-1">${icon('download', 'text-[16px]')} Baixar</button>` : ''}
     </div>
     <div class="relative"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
-      <input id="hist-search" placeholder="Buscar formulário, PAC ou operador..." class="w-full bg-surface-container-lowest border border-outline-variant/60 rounded-lg pl-10 pr-3 py-2.5 text-[13px]"></div>
+      <input id="hist-search" placeholder="${showOperators ? 'Buscar formulário, PAC ou operador...' : 'Buscar formulário, PAC...'}" class="w-full bg-surface-container-lowest border border-outline-variant/60 rounded-lg pl-10 pr-3 py-2.5 text-[13px]"></div>
     <div class="flex gap-2 overflow-x-auto scroll-area -mx-4 px-4">
-      ${[['todos', 'Todos'], ['hoje', 'Hoje'], ['ocorrencia', 'Com Ocorrência'], ['assinar', 'Aguardando']].map((f, i) => `<button data-filt="${f[0]}" class="filt-btn tap whitespace-nowrap text-[13px] font-semibold px-3.5 py-1.5 rounded-full ${i === 0 ? 'bg-primary text-on-primary' : 'bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant'}">${f[1]}</button>`).join('')}
+      ${[['todos', 'Todos'], ['hoje', 'Hoje'], ['ocorrencia', 'Não Conforme'], ...(showOperators ? [['assinar', 'A assinar']] : [])].map((f, i) => `<button data-filt="${f[0]}" class="filt-btn tap whitespace-nowrap text-[13px] font-semibold px-3.5 py-1.5 rounded-full ${i === 0 ? filtActiveCls() : filtInactiveCls(f[0])}">${f[1]}</button>`).join('')}
     </div>
     ${showOperators ? `<div class="flex gap-2">
       <div class="relative flex-1 min-w-0" data-dd="op">
@@ -65,9 +67,9 @@ function histBody(subs, title, sub, showOperators) {
 function histCard(s, showAssinar) {
   const f = getForm(s.formId); const pac = getPac(f.pacId);
   const meta = showAssinar
-    ? `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`
-    : `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">Enviado às ${fmtTime(s.ts)}</span>`;
-  const extra = s.occurrence ? `<div class="text-[11px] text-nc-tx font-medium truncate mt-0.5">Ocorrência: ${esc(s.occurrence.issues[0])}</div>` : '';
+    ? `${icon('check_circle', 'text-[14px] text-outline flex-none')}<span class="truncate">${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`
+    : `${icon('check_circle', 'text-[14px] text-outline flex-none')}<span class="truncate">Enviado às ${fmtTime(s.ts)}</span>`;
+  const extra = s.occurrence ? `<div class="text-[11px] text-nc-tx font-medium truncate mt-0.5">Não conforme: ${esc(s.occurrence.issues[0])}</div>` : '';
   let trailing;
   if (showAssinar) {
     trailing = s.signedBy
@@ -102,7 +104,7 @@ function bindHist(subs, showAssinar) {
       list.innerHTML = Object.entries(groups).map(([k, arr]) => { const isHoje = k === 'Hoje'; return `<div class="flex items-center gap-2 pt-1"><span class="w-2 h-2 rounded-full ${isHoje ? 'bg-secondary' : 'bg-outline-variant'}"></span><span class="mono text-[10px] uppercase tracking-widest ${isHoje ? 'text-on-surface' : 'text-on-surface-variant'} font-semibold">${k}</span><span class="mono text-[10px] text-on-surface-variant">· ${arr.length} registro${arr.length > 1 ? 's' : ''}</span></div>` + arr.map(s => histCard(s, showAssinar)).join(''); }).join('');
     }
   }
-  document.querySelectorAll('.filt-btn').forEach(b => b.onclick = () => { filt = b.dataset.filt; document.querySelectorAll('.filt-btn').forEach(x => x.className = 'filt-btn tap whitespace-nowrap text-[13px] font-semibold px-3.5 py-1.5 rounded-full bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant'); b.className = 'filt-btn tap whitespace-nowrap text-[13px] font-semibold px-3.5 py-1.5 rounded-full bg-primary text-on-primary'; apply(); });
+  document.querySelectorAll('.filt-btn').forEach(b => b.onclick = () => { filt = b.dataset.filt; document.querySelectorAll('.filt-btn').forEach(x => x.className = 'filt-btn tap whitespace-nowrap text-[13px] font-semibold px-3.5 py-1.5 rounded-full ' + filtInactiveCls(x.dataset.filt)); b.className = 'filt-btn tap whitespace-nowrap text-[13px] font-semibold px-3.5 py-1.5 rounded-full ' + filtActiveCls(); apply(); });
   const opLabel = v => v === 'Todos' ? 'Todos os operadores' : v;
   const scopeLabel = v => { if (!v) return 'Todos os PACs'; if (v.startsWith('pac:')) { const p = getPac(v.slice(4)); return 'Todo o ' + (p ? p.code : ''); } const f = getForm(v.slice(5)); return f ? f.title : 'Planilha'; };
   function wireDD(key) {

@@ -8,7 +8,7 @@ export const auditRouter = Router();
 // Recalcula a cadeia de hashes do zero e confere contra o que está gravado —
 // prova (ou desmente) a promessa de "trilha de auditoria imutável" da UI.
 auditRouter.get('/verify', authenticate, requireRole('gerente'), (req, res) => {
-  const rows = db.prepare('SELECT * FROM submissions ORDER BY seq ASC').all();
+  const rows = db.prepare('SELECT * FROM submissions WHERE unidade_id = ? ORDER BY seq ASC').all(req.user.unidade_id);
   let prevHash = null;
   const problems = [];
   for (const s of rows) {

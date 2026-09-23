@@ -6,6 +6,7 @@ import * as api from '../api.js';
 import { closeModal } from '../router.js';
 
 const app = () => $('app');
+const avatarChip = (u) => `<span data-uid="${u.id}" title="${esc(u.name)}" class="w-5 h-5 rounded-full flex items-center justify-center font-mono text-[8px] font-bold flex-none" style="background:${u.color || '#dfe9fb'};color:${u.ink || '#0f2642'}">${u.initials || '·'}</span>`;
 
 export async function renderEquipe() {
   try { await api.fetchTeam(); } catch (e) { toast(e.message || 'Não foi possível carregar a equipe.', 'err'); }
@@ -17,12 +18,13 @@ export async function renderEquipe() {
       <div class="relative flex-none"><span class="w-9 h-9 rounded-full flex items-center justify-center font-mono text-[11px] font-bold" style="background:${t.color || '#dfe9fb'};color:${t.ink || '#0f2642'}">${t.initials || '·'}</span></div>
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-on-surface text-[14px] truncate">${esc(t.name)}${isSelf ? ' (você)' : ''}</div>
-        ${isOp ? `<div class="flex items-center gap-1 text-[11px] text-on-surface-variant mt-0.5"><span class="truncate">${t.ownedFormIds.length} planilha${t.ownedFormIds.length !== 1 ? 's' : ''} autorizada${t.ownedFormIds.length !== 1 ? 's' : ''}</span></div>` : `<div class="text-[11px] text-on-surface-variant mt-0.5 truncate">${esc(t.cargo || '')}</div>`}
+        ${isOp ? `<div class="flex items-center gap-1 text-[11px] text-on-surface-variant mt-0.5"><span class="truncate">${t.ownedFormIds.length} planilha${t.ownedFormIds.length !== 1 ? 's' : ''} autorizada${t.ownedFormIds.length !== 1 ? 's' : ''}</span></div>` : ''}
       </div>
       <div class="flex items-center gap-2 flex-none">
         ${isTitular(t) ? `<span class="mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-primary text-on-primary">Admin</span>` : isOp ? `<span class="mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">Operador</span>` : `<span class="mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-inverse-primary text-primary">Gestor</span>`}
         ${t.canManage ? `<div class="flex items-center gap-0.5">
           <button data-action="edit-member" data-id="${t.id}" class="tap w-8 h-8 rounded-lg flex items-center justify-center text-primary">${icon('tune', 'text-[18px]')}</button>
+          <button data-action="reset-pass-member" data-id="${t.id}" class="tap w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant">${icon('key', 'text-[18px]')}</button>
           <button data-action="del-member" data-id="${t.id}" class="tap w-8 h-8 rounded-lg flex items-center justify-center text-error">${icon('delete', 'text-[18px]')}</button>
         </div>` : ''}
       </div>
@@ -53,14 +55,15 @@ export function inviteSheet() {
         <div><label class="mono text-[10px] uppercase text-on-surface-variant">Nome</label><input id="inv-name" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
         <div><label class="mono text-[10px] uppercase text-on-surface-variant">Usuário (login)</label><input id="inv-user" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
         <div class="flex gap-2">
-          <button data-inv-role="operador" class="inv-role-btn tap flex-1 py-2.5 rounded-lg text-[13px] font-semibold bg-primary text-on-primary">Operador</button>
-          <button data-inv-role="gerente" class="inv-role-btn tap flex-1 py-2.5 rounded-lg text-[13px] font-semibold bg-surface-container text-on-surface-variant">Gestor</button>
+          <button data-inv-role="operador" class="inv-role-btn tap flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold bg-primary text-on-primary">${icon('engineering', 'text-[18px]')} Operador</button>
+          ${currentUser.titular ? `<button data-inv-role="gerente" class="inv-role-btn tap flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold bg-surface-container text-on-surface-variant">${icon('shield_person', 'text-[18px]')} Gestor</button>` : ''}
         </div>
+        ${currentUser.titular ? '' : `<p class="text-[11px] text-on-surface-variant">Somente o titular pode criar contas de gestor.</p>`}
       </div>
       <button data-action="invite-confirm" class="tap w-full mt-4 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px]">Criar acesso</button>
     </div></div>`;
   window.__invRole = 'operador';
-  document.querySelectorAll('.inv-role-btn').forEach(b => b.onclick = () => { window.__invRole = b.dataset.invRole; document.querySelectorAll('.inv-role-btn').forEach(x => x.className = 'inv-role-btn tap flex-1 py-2.5 rounded-lg text-[13px] font-semibold ' + (x.dataset.invRole === window.__invRole ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant')); });
+  document.querySelectorAll('.inv-role-btn').forEach(b => b.onclick = () => { window.__invRole = b.dataset.invRole; document.querySelectorAll('.inv-role-btn').forEach(x => x.className = 'inv-role-btn tap flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold ' + (x.dataset.invRole === window.__invRole ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant')); });
 }
 
 export async function confirmInvite() {
@@ -93,8 +96,13 @@ export function renderEditSheet() {
       </div>
       <div class="divide-y divide-outline-variant/30 pl-1">
         ${fs.map(f => { const on = e.owned.has(f.id);
+          const linked = (f.operatorIds || []).map(id => DB.team.find(m => m.id === id)).filter(Boolean);
           return `<button data-action="edit-form-toggle" data-form="${f.id}" class="tap w-full flex items-center gap-3 py-2.5 px-1 text-left">
-            <div class="flex-1 min-w-0"><div class="text-[13px] font-medium text-on-surface truncate">${esc(f.title)}</div><div class="mono text-[10px] text-on-surface-variant truncate">${plCode(f)} · ${esc(dueText(f))}</div></div>
+            <div class="flex-1 min-w-0">
+              <div class="text-[13px] font-medium text-on-surface truncate">${esc(f.title)}</div>
+              <div class="mono text-[10px] text-on-surface-variant truncate">${plCode(f)} · ${esc(dueText(f))}</div>
+              <div class="linked-avatars flex items-center gap-1 mt-1.5 ${linked.length ? '' : 'hidden'}">${linked.map(u => avatarChip(u)).join('')}</div>
+            </div>
             <span class="material-symbols-outlined ${on ? 'ms-fill text-secondary' : 'text-outline-variant'} text-[24px]">${on ? 'check_circle' : 'radio_button_unchecked'}</span>
           </button>`; }).join('')}
       </div>
@@ -110,23 +118,75 @@ export function renderEditSheet() {
         <button data-action="close-x" class="tap w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant">${icon('close', 'text-[20px]')}</button>
       </div>
       <p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mt-4 mb-2">Função</p>
-      <div class="flex gap-2">${roleBtn('operador', 'Operador', 'engineering')}${roleBtn('gerente', 'Gestor', 'shield_person')}</div>
+      <div class="flex gap-2">${roleBtn('operador', 'Operador', 'engineering')}${currentUser.titular ? roleBtn('gerente', 'Gestor', 'shield_person') : ''}</div>
+      ${currentUser.titular ? '' : `<p class="mono text-[10px] text-on-surface-variant mt-1">Somente o titular pode promover alguém a gestor.</p>`}
       ${e.role === 'operador'
         ? `<div class="mt-4 flex items-start gap-2 bg-surface-container rounded-lg p-3 text-on-surface-variant text-[12px]">${icon('engineering', 'text-primary text-[18px] flex-none', true)}<span>O operador preenche e assina digitalmente, no seu turno, apenas as planilhas autorizadas abaixo. Não acessa o painel de gestão, o histórico da fábrica nem assina planilhas de outros.</span></div>
-           <p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mt-4 mb-1">Planilhas Permitidas · ${e.owned.size}</p>${formsSection}`
+           <p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mt-4 mb-1">Planilhas Permitidas · <span id="owned-count">${e.owned.size}</span></p>${formsSection}`
         : `<div class="mt-4 flex items-start gap-2 bg-inverse-primary rounded-lg p-3 text-primary text-[12px]">${icon('verified_user', 'text-[18px] flex-none', true)}<span>O gestor valida e assina as planilhas, acompanha o painel e o histórico de toda a unidade e gerencia os operadores. Não preenche planilhas — isso é do operador.</span></div>`}
       <button data-action="save-member" class="tap w-full mt-4 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px]">Salvar acessos</button>
     </div></div>`;
+}
+
+// alterna o acesso sem re-renderizar o popup inteiro: só troca o ícone de check
+// e o avatar da própria pessoa embaixo da planilha, pra não "piscar" a tela.
+export function toggleFormAccess(formId) {
+  const e = window.__edit; if (!e) return;
+  const btn = document.querySelector(`[data-action="edit-form-toggle"][data-form="${formId}"]`);
+  const nowOn = !e.owned.has(formId);
+  nowOn ? e.owned.add(formId) : e.owned.delete(formId);
+  if (!btn) { renderEditSheet(); return; }
+
+  const chk = btn.querySelector('.material-symbols-outlined');
+  if (chk) {
+    chk.textContent = nowOn ? 'check_circle' : 'radio_button_unchecked';
+    chk.className = `material-symbols-outlined ${nowOn ? 'ms-fill text-secondary' : 'text-outline-variant'} text-[24px]`;
+  }
+
+  const t = DB.team.find(x => x.id === e.id);
+  const row = btn.querySelector('.linked-avatars');
+  if (row && t) {
+    const existing = row.querySelector(`[data-uid="${t.id}"]`);
+    if (nowOn && !existing) row.insertAdjacentHTML('beforeend', avatarChip(t));
+    else if (!nowOn && existing) existing.remove();
+    row.classList.toggle('hidden', !row.children.length);
+  }
+
+  const counter = document.getElementById('owned-count');
+  if (counter) counter.textContent = e.owned.size;
 }
 
 export async function saveMember() {
   const e = window.__edit;
   try {
     await api.updateMember(e.id, e.role, [...e.owned]);
+    await api.refreshState();
     closeModal();
     await renderEquipe();
     toast('Acessos atualizados.');
   } catch (err) { toast(err.message || 'Não foi possível salvar os acessos.', 'err'); }
+}
+
+export function confirmResetPassword(id) {
+  const t = DB.team.find(x => x.id === id); if (!t) return;
+  $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-center justify-center p-4" data-close-modal>
+    <div class="absolute inset-0 bg-black/40" data-close-modal></div>
+    <div class="relative bg-surface-container-lowest rounded-2xl w-full max-w-[380px] shadow-2xl p-5">
+      <div class="flex items-center gap-2 mb-2">${icon('key', 'text-primary text-[24px]', true)}<div class="font-semibold text-on-surface text-[16px]">Redefinir senha de ${esc(t.name)}?</div></div>
+      <p class="text-[13px] text-on-surface-variant mb-4">A senha atual deixa de funcionar e uma nova senha temporária é gerada na hora — repasse para ${esc(t.name.split(' ')[0])}.</p>
+      <div class="flex gap-2">
+        <button data-action="close-x" class="tap flex-1 bg-surface-container text-on-surface rounded-xl py-3 font-semibold text-[14px]">Cancelar</button>
+        <button data-action="reset-pass-confirm" data-id="${t.id}" class="tap flex-1 bg-primary text-on-primary rounded-xl py-3 font-semibold text-[14px]">Redefinir</button>
+      </div>
+    </div></div>`;
+}
+
+export async function resetMemberPassword(id) {
+  try {
+    const { tempPassword } = await api.resetMemberPassword(id);
+    closeModal();
+    toast(`Senha redefinida. Nova senha temporária: ${tempPassword}`, 'info');
+  } catch (e) { toast(e.message || 'Não foi possível redefinir a senha.', 'err'); }
 }
 
 export function confirmDelete(id) {

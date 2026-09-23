@@ -3,19 +3,37 @@ import { currentUser, getUnidade } from '../state.js';
 import * as api from '../api.js';
 import { closeModal } from '../router.js';
 
-export function profileMenu() {
+export function profileMenu(triggerEl) {
   const mr = $('modal-root');
   if (mr.querySelector('#profile-pop')) { mr.innerHTML = ''; return; }
   mr.innerHTML = `<div class="fixed inset-0 z-50" data-close-modal>
-    <div id="profile-pop" class="fade-in absolute w-64 max-w-[calc(100vw-24px)] bg-surface-container-lowest rounded-xl shadow-2xl border border-outline-variant/50 overflow-hidden" style="top:56px; right:max(12px, calc(50vw - 203px))">
+    <div id="profile-pop" class="fade-in absolute w-64 max-w-[calc(100vw-24px)] bg-surface-container-lowest rounded-xl shadow-2xl border border-outline-variant/50 overflow-hidden">
       <div class="flex items-center gap-3 p-4 border-b border-outline-variant/40">
         <span class="w-11 h-11 rounded-full flex items-center justify-center font-mono text-[14px] font-bold" style="background:${currentUser.color};color:${currentUser.ink}">${currentUser.initials}</span>
-        <div class="min-w-0"><div class="font-semibold text-on-surface truncate">${esc(currentUser.name)}</div><div class="text-[12px] text-on-surface-variant truncate">${currentUser.role === 'operador' ? esc(currentUser.turno || 'Operador') : esc(currentUser.cargo || 'RT / Gerência')}</div></div>
+        <div class="min-w-0"><div class="font-semibold text-on-surface truncate">${esc(currentUser.name)}</div><div class="text-[12px] text-on-surface-variant truncate">${currentUser.titular ? 'Admin' : currentUser.role === 'gerente' ? 'Gestor' : 'Operador'}</div></div>
       </div>
-      ${currentUser.role === 'gerente' ? `<button data-action="unidade" class="tap w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-container">${icon('domain', 'text-on-surface-variant text-[20px]')}<span class="text-[14px] text-on-surface">Dados da unidade</span></button>` : ''}
+      ${currentUser.titular ? `<button data-action="unidade" class="tap w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-container">${icon('domain', 'text-on-surface-variant text-[20px]')}<span class="text-[14px] text-on-surface">Dados da unidade</span></button>` : ''}
       <button data-action="change-pass" class="tap w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-container">${icon('key', 'text-on-surface-variant text-[20px]')}<span class="text-[14px] text-on-surface">Alterar senha</span></button>
       <button data-action="logout" class="tap w-full flex items-center gap-3 px-4 py-3 text-left text-error border-t border-outline-variant/40 hover:bg-surface-container">${icon('logout', 'text-error text-[20px]')}<span class="text-[14px] font-semibold">Sair da conta</span></button>
     </div></div>`;
+
+  // posiciona ancorado no próprio botão que abriu o menu, em vez de uma fórmula fixa de
+  // viewport — essa fórmula só valia quando o app inteiro ficava numa moldura de celular
+  // centralizada; num layout responsivo (sidebar no desktop) ela cai em qualquer lugar.
+  // ancora pela direita (alinhado à borda direita do botão) em vez de calcular `left`
+  // a partir de offsetWidth: o Tailwind do CDN gera as classes de forma assíncrona,
+  // então no instante da medição o `w-64` ainda não existe e a largura vem errada
+  // (quase a tela toda), jogando o popup pra esquerda.
+  const pop = $('profile-pop');
+  if (triggerEl && pop) {
+    const r = triggerEl.getBoundingClientRect();
+    const margin = 12;
+    pop.style.width = 'min(256px, calc(100vw - 24px))';
+    pop.style.right = Math.max(margin, window.innerWidth - r.right) + 'px';
+    pop.style.top = (r.bottom + 8) + 'px';
+  } else if (pop) {
+    pop.style.top = '56px'; pop.style.right = '12px';
+  }
 }
 
 export function changePasswordSheet() {

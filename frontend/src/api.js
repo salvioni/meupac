@@ -1,5 +1,5 @@
 import { API_BASE, TOKEN_KEY } from './config.js';
-import { setDB, setCurrentUser, DB } from './state.js';
+import { setDB, setCurrentUser, DB, currentUser } from './state.js';
 
 let token = null;
 try { token = localStorage.getItem(TOKEN_KEY); } catch (e) { /* localStorage indisponível */ }
@@ -35,6 +35,13 @@ export async function login(username, password) {
   return data.user;
 }
 
+export async function signup(payload) {
+  const data = await request('/auth/signup', { method: 'POST', body: payload });
+  setToken(data.token);
+  setCurrentUser(data.user);
+  return data.user;
+}
+
 export function logout() { setToken(null); setCurrentUser(null); }
 
 export async function tryResumeSession() {
@@ -51,8 +58,11 @@ export async function changePassword(currentPassword, newPassword) {
 }
 
 export async function refreshState() {
-  const data = await request('/state');
-  setDB({ ...data, team: DB.team }); // team só é carregado à parte (gestor), preserva o que já tiver em cache
+  // o gestor precisa da equipe já no painel/PACs (nome de quem preenche cada planilha),
+  // não só depois de abrir a tela Equipe — senão tudo aparece como "—" após login/F5.
+  const isGestor = currentUser && currentUser.role === 'gerente';
+  const [data, teamData] = await Promise.all([request('/state'), isGestor ? request('/team') : null]);
+  setDB({ ...data, team: teamData ? teamData.team : DB.team });
   return data;
 }
 
@@ -79,6 +89,10 @@ export async function setPacActive(id, active) {
   const data = await request(`/pacs/${id}/active`, { method: 'PUT', body: { active } });
   return data.pac;
 }
+export async function setFormActive(id, active) {
+  const data = await request(`/forms/${id}/active`, { method: 'PUT', body: { active } });
+  return data.form;
+}
 
 export async function createForm(payload) {
   const data = await request('/forms', { method: 'POST', body: payload });
@@ -87,6 +101,9 @@ export async function createForm(payload) {
 export async function updateForm(id, payload) {
   const data = await request(`/forms/${id}`, { method: 'PUT', body: payload });
   return data.form;
+}
+export async function deleteForm(id) {
+  return request(`/forms/${id}`, { method: 'DELETE' });
 }
 
 export async function inviteMember(name, username, role) {
@@ -98,6 +115,9 @@ export async function updateMember(id, role, ownedFormIds) {
 }
 export async function deleteMember(id) {
   return request(`/team/${id}`, { method: 'DELETE' });
+}
+export async function resetMemberPassword(id) {
+  return request(`/team/${id}/reset-password`, { method: 'POST' });
 }
 
 export async function saveUnidade(payload) {

@@ -3,7 +3,7 @@ import { params, getForm, getPac, DB, nextPlNum, revLabel } from '../state.js';
 import { shell, profileTrigger } from '../ui.js';
 import { GE_NAV } from '../config.js';
 import * as api from '../api.js';
-import { navigate } from '../router.js';
+import { navigate, closeModal } from '../router.js';
 
 const app = () => $('app');
 
@@ -13,35 +13,53 @@ export function renderFormEditor() {
   window.__editorParams = editing ? JSON.parse(JSON.stringify(editing.params)) : [{ id: 'np' + Date.now(), type: 'numeric', name: '', unit: '', min: 0, max: 0, step: 0.1, seed: 0 }];
   window.__editorTimes = editing ? (editing.times && editing.times.length ? editing.times.slice() : (editing.due ? [editing.due] : [])) : [];
   window.__when = editing && editing.schedule
-    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), days: (editing.schedule.days || editing.days || []).slice() }
-    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), days: [] };
+    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
+    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), days: [], toleranceMin: 0 };
 
   const inner = `<div class="px-4 py-4 space-y-4 pb-8">
-    <button data-action="nav" data-nav="ge_forms" class="tap inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary">${icon('arrow_back', 'text-[18px]')} Voltar para PACs</button>
+    <div class="flex items-center justify-between">
+      <button data-action="nav" data-nav="ge_forms" class="tap inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary">${icon('arrow_back', 'text-[18px]')} Voltar para PACs</button>
+      ${editing ? `<button data-action="delete-form" data-form="${editing.id}" class="tap w-9 h-9 rounded-lg flex items-center justify-center text-error">${icon('delete', 'text-[20px]')}</button>` : ''}
+    </div>
     <h1 class="text-[22px] font-bold text-on-surface leading-tight">${editing ? 'Configurar Planilha' : 'Nova Planilha'}</h1>
 
-    <section class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-4 space-y-3">
-      <div class="flex items-center gap-2">${icon('badge', 'text-secondary text-[18px]', true)}<h2 class="mono text-[11px] uppercase tracking-widest text-on-surface font-semibold">Identificação Normativa</h2></div>
-      <div class="bg-surface-container-low rounded-lg p-3"><div class="mono text-[10px] uppercase text-on-surface-variant">PAC Vinculado</div><div class="font-semibold text-on-surface">${pac.code} · ${esc(pac.name)}</div><div class="mono text-[11px] text-secondary">${esc(pac.norm)}</div></div>
-      <div><label class="mono text-[10px] uppercase text-on-surface-variant">Título do Documento</label>
-      <input id="ed-title" value="${editing ? esc(editing.title) : ''}" placeholder="Ex: Controle Diário de Cloração" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
-      <div class="flex items-center justify-between bg-surface-container-low rounded-lg px-3 py-2.5">
-        <div><div class="mono text-[10px] uppercase text-on-surface-variant">Código da Planilha</div><div class="mono text-[13px] font-bold text-on-surface">PL ${String(editing ? editing.plNum : nextPlNum(pac.id)).padStart(2, '0')}</div></div>
-        <div class="text-right"><div class="mono text-[10px] uppercase text-on-surface-variant">${editing ? 'Ao publicar' : 'Revisão'}</div><div class="mono text-[13px] font-bold ${editing ? 'text-tertiary' : 'text-secondary'}">${editing ? 'Rev. ' + String((editing.rev || 1) + 1).padStart(2, '0') : 'Rev. 01'}</div></div>
+    <section class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl overflow-hidden">
+      <button type="button" data-toggle-section="ident" class="tap w-full flex items-center justify-between gap-2 p-4">
+        <div class="flex items-center gap-2">${icon('badge', 'text-secondary text-[18px]', true)}<h2 class="mono text-[11px] uppercase tracking-widest text-on-surface font-semibold">Identificação Normativa</h2></div>
+        <span class="material-symbols-outlined text-on-surface-variant text-[20px]" data-chevron>expand_less</span>
+      </button>
+      <div class="px-4 pb-4 space-y-3" data-section-body="ident">
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Título do Documento</label>
+        <input id="ed-title" value="${editing ? esc(editing.title) : ''}" placeholder="Ex: Controle Diário de Cloração" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
+        <div class="bg-surface-container-low rounded-lg p-3"><div class="mono text-[10px] uppercase text-on-surface-variant">PAC Vinculado</div><div class="text-[13px] font-bold text-on-surface">${pac.code} · ${esc(pac.name)}</div></div>
+        <div class="flex items-center justify-between bg-surface-container-low rounded-lg px-3 py-2.5">
+          <div><div class="mono text-[10px] uppercase text-on-surface-variant">Código da Planilha</div><div class="mono text-[13px] font-bold text-on-surface">PL ${String(editing ? editing.plNum : nextPlNum(pac.id)).padStart(2, '0')}</div></div>
+          <div class="text-right"><div class="mono text-[10px] uppercase text-on-surface-variant">${editing ? 'Ao publicar' : 'Revisão'}</div><div class="mono text-[13px] font-bold ${editing ? 'text-tertiary' : 'text-secondary'}">${editing ? 'Rev. ' + String((editing.rev || 1) + 1).padStart(2, '0') : 'Rev. 01'}</div></div>
+        </div>
+        ${editing ? `<div class="flex items-center gap-1.5 text-[11px] text-on-surface-variant">${icon('history', 'text-[15px]')} Vigente: ${revLabel(editing)} · a versão anterior fica arquivada na auditoria.</div>` : ''}
       </div>
-      ${editing ? `<div class="flex items-center gap-1.5 text-[11px] text-on-surface-variant">${icon('history', 'text-[15px]')} Vigente: ${revLabel(editing)} · a versão anterior fica arquivada na auditoria.</div>` : ''}
     </section>
 
-    <section class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-4 space-y-3">
-      <div class="flex items-center gap-2">${icon('schedule', 'text-secondary text-[18px]', true)}<h2 class="mono text-[11px] uppercase tracking-widest text-on-surface font-semibold">Frequência & Coleta</h2></div>
-      <div id="ed-when-wrap"></div>
-      <div><label class="mono text-[10px] uppercase text-on-surface-variant">Local / Ponto de Coleta</label><input id="ed-loc" value="${editing ? esc(editing.location) : ''}" placeholder="Ex: Reservatório Central" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
+    <section class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl overflow-hidden">
+      <button type="button" data-toggle-section="freq" class="tap w-full flex items-center justify-between gap-2 p-4">
+        <div class="flex items-center gap-2">${icon('schedule', 'text-secondary text-[18px]', true)}<h2 class="mono text-[11px] uppercase tracking-widest text-on-surface font-semibold">Frequência & Coleta</h2></div>
+        <span class="material-symbols-outlined text-on-surface-variant text-[20px]" data-chevron>expand_less</span>
+      </button>
+      <div class="px-4 pb-4 space-y-3" data-section-body="freq">
+        <div id="ed-when-wrap"></div>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Local / Ponto de Coleta</label><input id="ed-loc" value="${editing ? esc(editing.location) : ''}" placeholder="Ex: Reservatório Central" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
+      </div>
     </section>
 
-    <section class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-4 space-y-3">
-      <div class="flex items-center gap-2">${icon('tune', 'text-secondary text-[18px]', true)}<h2 class="mono text-[11px] uppercase tracking-widest text-on-surface font-semibold">Parâmetros e Limites Críticos</h2></div>
-      <div id="ed-params" class="space-y-3"></div>
-      <button data-action="add-param" class="tap w-full flex items-center justify-center gap-1.5 bg-surface-container text-primary rounded-lg py-2.5 font-semibold text-[13px]">${icon('add_circle', 'text-[18px]', true)} Adicionar Parâmetro</button>
+    <section class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl overflow-hidden">
+      <button type="button" data-toggle-section="params" class="tap w-full flex items-center justify-between gap-2 p-4">
+        <div class="flex items-center gap-2">${icon('tune', 'text-secondary text-[18px]', true)}<h2 class="mono text-[11px] uppercase tracking-widest text-on-surface font-semibold">Parâmetros e Limites Críticos</h2></div>
+        <span class="material-symbols-outlined text-on-surface-variant text-[20px]" data-chevron>expand_less</span>
+      </button>
+      <div class="px-4 pb-4 space-y-3" data-section-body="params">
+        <div id="ed-params" class="space-y-3"></div>
+        <button data-action="add-param" class="tap w-full flex items-center justify-center gap-1.5 bg-surface-container text-primary rounded-lg py-2.5 font-semibold text-[13px]">${icon('add_circle', 'text-[18px]', true)} Adicionar Parâmetro</button>
+      </div>
     </section>
 
     <button data-action="save-form" class="tap w-full bg-primary text-on-primary rounded-xl py-4 font-semibold flex items-center justify-center gap-2 text-[15px]">${editing ? 'Salvar e Publicar Rev. ' + String((editing.rev || 1) + 1).padStart(2, '0') : 'Criar Planilha'}</button>
@@ -50,6 +68,14 @@ export function renderFormEditor() {
   app().innerHTML = shell(inner, GE_NAV, 'ge_forms', profileTrigger());
   renderEditorParams();
   renderWhen();
+  document.querySelectorAll('[data-toggle-section]').forEach(btn => {
+    btn.onclick = () => {
+      const body = document.querySelector(`[data-section-body="${btn.dataset.toggleSection}"]`);
+      const chev = btn.querySelector('[data-chevron]');
+      const nowHidden = body.classList.toggle('hidden');
+      chev.textContent = nowHidden ? 'expand_more' : 'expand_less';
+    };
+  });
 }
 
 export function renderWhen() {
@@ -59,7 +85,12 @@ export function renderWhen() {
   let body = '';
   if (w.type === 'fixos') {
     body = `<div id="ed-times" class="flex flex-wrap gap-2"></div>
-      <button data-action="add-time" class="tap mt-2 inline-flex items-center gap-1 text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} Adicionar horário</button>`;
+      <button data-action="add-time" class="tap mt-2 inline-flex items-center gap-1 text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} Adicionar horário</button>
+      <div class="flex items-center gap-2 mt-3">
+        <span class="text-[13px] text-on-surface">Tolerância de</span>
+        <input id="ed-tolerance" type="number" min="0" value="${w.toleranceMin}" class="w-16 bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface text-center border border-transparent focus:border-primary">
+        <span class="text-[13px] text-on-surface">minutos antes de marcar como atrasada</span>
+      </div>`;
   } else if (w.type === 'intervalo') {
     body = `<div class="flex items-center gap-2">
       <span class="text-[13px] text-on-surface">A cada</span>
@@ -100,7 +131,7 @@ export function renderWhen() {
 
 export function syncWhen() {
   const w = window.__when;
-  if (w.type === 'fixos') { syncEditorTimes(); }
+  if (w.type === 'fixos') { syncEditorTimes(); const t = $('ed-tolerance'); if (t) w.toleranceMin = Math.max(0, parseInt(t.value, 10) || 0); }
   else if (w.type === 'intervalo') { const e = $('ed-every'), u = $('ed-unit'); if (e) w.every = Math.max(1, parseInt(e.value) || 1); if (u) w.unit = u.value; }
   else if (w.type === 'vezes') { const c = $('ed-count'), pd = $('ed-period'); if (c) w.count = Math.max(1, parseInt(c.value) || 1); if (pd) w.period = pd.value; }
 }
@@ -134,27 +165,191 @@ export function syncEditorTimes() {
   });
 }
 
+const PARAM_TYPES = [
+  ['numeric', 'Mín/Máx', 'straighten', 'Medição numérica com faixa aceitável'],
+  ['numero', 'Número Livre', 'tag', 'Registra um número, sem faixa nem avaliação'],
+  ['qualitative', 'Conformidade', 'verified', 'O operador marca Conforme ou Não Conforme'],
+  ['texto', 'Texto', 'notes', 'Resposta livre, sem avaliação'],
+  ['simnao', 'Sim/Não', 'help', 'Pergunta neutra, sem julgar certo ou errado'],
+  ['data', 'Data', 'calendar_today', 'Data de um evento específico (ex: início do reparo) — diferente da data do envio, que já fica registrada sozinha'],
+  ['hora', 'Hora', 'schedule', 'Horário de um evento específico (ex: término do reparo) — diferente do horário do envio, que já fica registrado sozinho'],
+  ['escolha', 'Múltipla Escolha', 'checklist', 'Você define as opções; pode marcar quais contam como não conformidade'],
+];
+const paramTypeInfo = (type) => PARAM_TYPES.find(([v]) => v === type) || PARAM_TYPES[1];
+
+function defaultParamFields(type) {
+  if (type === 'numeric') return { unit: '', min: 0, max: 0, step: 0.1, seed: 0 };
+  if (type === 'numero') return { unit: '', step: 1, seed: 0 };
+  if (type === 'qualitative') return { good: 'Conforme' };
+  if (type === 'escolha') return { options: ['Opção 1', 'Opção 2'], ncOptions: [] };
+  return {};
+}
+
+// sheet de escolha de tipo — abre tanto pro "+ Adicionar Parâmetro" (targetIndex -1,
+// cria um parâmetro novo) quanto pra trocar o tipo de um já existente (mantém nome e id).
+function openParamTypePicker(targetIndex) {
+  $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-end sm:items-center justify-center" data-close-modal>
+    <div class="absolute inset-0 bg-black/40" data-close-modal></div>
+    <div class="relative bg-surface-container-lowest rounded-t-2xl sm:rounded-2xl w-full sm:max-w-[420px] max-h-[80dvh] overflow-y-auto scroll-area shadow-2xl p-4 sheet-enter">
+      <div class="flex items-center justify-between pb-3 border-b border-outline-variant/40">
+        <div class="font-semibold text-on-surface text-[16px]">Tipo de parâmetro</div>
+        <button data-action="close-x" class="tap w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant">${icon('close', 'text-[20px]')}</button>
+      </div>
+      <div class="space-y-1 mt-2">
+        ${PARAM_TYPES.map(([v, label, ic, desc]) => `<button data-pick-type="${v}" class="tap w-full flex items-center gap-3 p-2.5 rounded-xl text-left hover:bg-surface-container">
+          <span class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center flex-none">${icon(ic, 'text-primary text-[20px]', true)}</span>
+          <div class="flex-1 min-w-0"><div class="font-semibold text-on-surface text-[14px]">${label}</div><div class="text-[11px] text-on-surface-variant">${desc}</div></div>
+        </button>`).join('')}
+      </div>
+    </div></div>`;
+  $('modal-root').querySelectorAll('[data-pick-type]').forEach(b => b.onclick = () => {
+    syncEditorParams();
+    const type = b.dataset.pickType;
+    if (targetIndex === -1) {
+      window.__editorParams.push({ id: 'np' + Date.now() + Math.random().toString(36).slice(2, 6), type, name: '', required: true, ...defaultParamFields(type) });
+    } else {
+      const p = window.__editorParams[targetIndex];
+      Object.keys(defaultParamFields(p.type)).forEach(k => delete p[k]);
+      Object.assign(p, defaultParamFields(type));
+      p.type = type;
+    }
+    closeModal();
+    renderEditorParams();
+  });
+}
+export function openAddParam() { openParamTypePicker(-1); }
+
+function paramTypeBody(p) {
+  if (p.type === 'numeric') return `
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Mínimo</label><input data-pmin type="number" step="0.1" placeholder="0.5" value="${p.min || ''}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Máximo</label><input data-pmax type="number" step="0.1" placeholder="2.0" value="${p.max || ''}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Incremento (+/-)</label><input data-pstep type="number" step="0.1" min="0.01" placeholder="0.1" value="${p.step || 0.1}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Unidade</label><input data-punit placeholder="ppm" value="${esc(p.unit)}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
+      </div>`;
+
+  if (p.type === 'numero') return `
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Incremento (+/-)</label><input data-pstep type="number" step="0.1" min="0.01" placeholder="1" value="${p.step || 1}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Unidade (opcional)</label><input data-punit placeholder="unid." value="${esc(p.unit)}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
+      </div>
+      <p class="text-[11px] text-on-surface-variant">Registra o número que o operador digitar — sem faixa mínima/máxima nem avaliação de conformidade.</p>`;
+
+  if (p.type === 'texto') return `
+      <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-lg p-3">
+        <div class="mono text-[10px] text-on-surface-variant">Resposta do operador</div>
+        <div class="h-8 border-b border-dashed border-outline-variant mt-1"></div>
+      </div>
+      <p class="text-[11px] text-on-surface-variant">O operador escreve uma resposta curta — não conta como não conformidade.</p>`;
+
+  if (p.type === 'simnao') return `
+      <div class="grid grid-cols-2 gap-2">
+        <div class="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-surface-container text-on-surface font-semibold text-[13px]">${icon('check', 'text-[16px]')} Sim</div>
+        <div class="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-surface-container text-on-surface font-semibold text-[13px]">${icon('close', 'text-[16px]')} Não</div>
+      </div>
+      <p class="text-[11px] text-on-surface-variant">Pergunta neutra — qualquer resposta conta como preenchida, sem gerar não conformidade.</p>`;
+
+  if (p.type === 'data') return `
+      <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-lg p-3 flex items-center gap-2">
+        ${icon('calendar_today', 'text-on-surface-variant text-[16px]')}<span class="mono text-[12px] text-on-surface-variant">dd/mm/aaaa</span>
+      </div>
+      <p class="text-[11px] text-on-surface-variant">Use pra data de um evento (ex: início de um reparo) — não pra "quando preencheu", isso já é registrado sozinho.</p>`;
+
+  if (p.type === 'hora') return `
+      <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-lg p-3 flex items-center gap-2">
+        ${icon('schedule', 'text-on-surface-variant text-[16px]')}<span class="mono text-[12px] text-on-surface-variant">hh:mm</span>
+      </div>
+      <p class="text-[11px] text-on-surface-variant">Use pra horário de um evento (ex: término de um reparo) — não pra "quando preencheu", isso já é registrado sozinho.</p>`;
+
+  if (p.type === 'escolha') {
+    const options = p.options && p.options.length ? p.options : ['Opção 1', 'Opção 2'];
+    const ncOptions = p.ncOptions || [];
+    return `
+      <div class="space-y-1.5" data-opts>
+        ${options.map((op, oi) => `<div class="flex items-center gap-2" data-opt-row="${oi}">
+          <input data-opt-val value="${esc(op)}" placeholder="Opção ${oi + 1}" class="flex-1 bg-surface-container-low rounded-lg px-3 py-2 text-[13px] border border-transparent focus:border-primary">
+          <button type="button" data-opt-nc class="tap flex-none mono text-[9px] font-semibold uppercase px-2 py-1.5 rounded ${ncOptions.includes(op) ? 'bg-nc-bg text-nc-tx' : 'bg-surface-container text-on-surface-variant'}">Não conf.</button>
+          ${options.length > 2 ? `<button type="button" data-opt-del class="tap flex-none text-on-surface-variant">${icon('close', 'text-[18px]')}</button>` : ''}
+        </div>`).join('')}
+      </div>
+      <button type="button" data-opt-add class="tap inline-flex items-center gap-1 text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} Adicionar opção</button>
+      <p class="text-[11px] text-on-surface-variant">O operador escolhe uma das opções. Marque "Não conf." nas que devem contar como não conformidade (ex.: "NC" em C/NC/NA).</p>`;
+  }
+
+  // qualitative (Conformidade)
+  const hasCustomGood = !!p.good && p.good !== 'Conforme';
+  return `
+      <div class="grid grid-cols-2 gap-2">
+        <div class="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-conf-bg text-conf-tx font-semibold text-[13px]">${icon('check_circle', 'text-[16px]', true)}<span data-preview-good>${esc(p.good || 'Conforme')}</span></div>
+        <div class="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-nc-bg text-nc-tx font-semibold text-[13px]">${icon('cancel', 'text-[16px]', true)} Não Conf.</div>
+      </div>
+      <p class="text-[11px] text-on-surface-variant">É assim que o operador marca essa medição — sem digitar nada.</p>
+      <button type="button" data-toggle-good class="${hasCustomGood ? 'hidden' : ''} text-[12px] font-semibold text-primary">Personalizar texto de "conforme"</button>
+      <div data-good-custom class="${hasCustomGood ? '' : 'hidden'}">
+        <label class="mono text-[10px] uppercase text-on-surface-variant">Texto quando conforme</label>
+        <input data-pgood placeholder="Conforme" value="${esc(p.good || 'Conforme')}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 text-[13px] border border-transparent focus:border-primary">
+      </div>`;
+}
+
 export function renderEditorParams() {
   const wrap = $('ed-params'); if (!wrap) return;
-  wrap.innerHTML = window.__editorParams.map((p, i) => `<div class="border border-outline-variant/60 rounded-lg p-3 space-y-2" data-pidx="${i}">
-    <div class="flex items-center justify-between">
-      <div class="flex gap-1.5">
-        <button data-ptype="numeric" class="tap mono text-[10px] font-semibold px-2 py-1 rounded ${p.type === 'numeric' ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'}">Numérico</button>
-        <button data-ptype="qualitative" class="tap mono text-[10px] font-semibold px-2 py-1 rounded ${p.type === 'qualitative' ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'}">Qualitativo</button>
+  wrap.innerHTML = window.__editorParams.map((p, i) => {
+    const [, typeLabel, typeIcon] = paramTypeInfo(p.type);
+    const required = p.required !== false;
+    return `<div class="border border-outline-variant/60 rounded-xl p-4 space-y-3" data-pidx="${i}">
+    <div class="flex items-center justify-between gap-2">
+      <button type="button" data-change-type class="tap flex items-center gap-1.5 bg-surface-container text-on-surface rounded-lg pl-2 pr-1.5 py-1.5">
+        ${icon(typeIcon, 'text-primary text-[16px]', true)}<span class="mono text-[10px] font-semibold">${typeLabel}</span>${icon('expand_more', 'text-on-surface-variant text-[16px]')}
+      </button>
+      <div class="flex items-center gap-3 flex-none">
+        <label class="flex items-center gap-1.5 text-[11px] text-on-surface-variant"><span data-required-toggle class="toggle ${required ? 'on' : ''}"></span>Obrigatório</label>
+        ${window.__editorParams.length > 1 ? `<button data-del-param class="tap text-error flex-none">${icon('delete', 'text-[18px]')}</button>` : ''}
       </div>
-      ${window.__editorParams.length > 1 ? `<button data-del-param class="tap text-error">${icon('delete', 'text-[18px]')}</button>` : ''}
     </div>
-    <input data-pname placeholder="Nome do parâmetro" value="${esc(p.name)}" class="w-full bg-surface-container-low rounded-lg px-3 py-2 text-[13px] border border-transparent focus:border-primary">
-    ${p.type === 'numeric' ? `<div class="grid grid-cols-3 gap-2">
-      <input data-pmin type="number" step="0.1" placeholder="Mín" value="${p.min || ''}" class="bg-surface-container-low rounded-lg px-2 py-2 mono text-[13px] border border-transparent focus:border-primary">
-      <input data-pmax type="number" step="0.1" placeholder="Máx" value="${p.max || ''}" class="bg-surface-container-low rounded-lg px-2 py-2 mono text-[13px] border border-transparent focus:border-primary">
-      <input data-punit placeholder="Un" value="${esc(p.unit)}" class="bg-surface-container-low rounded-lg px-2 py-2 mono text-[13px] border border-transparent focus:border-primary">
-    </div>` : `<input data-pgood placeholder="Resposta esperada (ex: Conforme)" value="${esc(p.good || 'Conforme')}" class="w-full bg-surface-container-low rounded-lg px-3 py-2 text-[13px] border border-transparent focus:border-primary">`}
-  </div>`).join('');
+    <div><label class="mono text-[10px] uppercase text-on-surface-variant">Título</label>
+      <input data-pname placeholder="Ex: Cloro Livre" value="${esc(p.name)}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] font-semibold text-on-surface border border-transparent focus:border-primary"></div>
+    ${paramTypeBody(p)}
+  </div>`;
+  }).join('');
   wrap.querySelectorAll('[data-pidx]').forEach(box => {
     const i = +box.dataset.pidx;
-    box.querySelectorAll('[data-ptype]').forEach(b => b.onclick = () => { syncEditorParams(); window.__editorParams[i].type = b.dataset.ptype; renderEditorParams(); });
+    const changeType = box.querySelector('[data-change-type]');
+    if (changeType) changeType.onclick = () => { syncEditorParams(); openParamTypePicker(i); };
+    const reqToggle = box.querySelector('[data-required-toggle]');
+    if (reqToggle) reqToggle.onclick = () => {
+      const p = window.__editorParams[i];
+      p.required = !(p.required !== false);
+      reqToggle.classList.toggle('on', p.required);
+    };
     const del = box.querySelector('[data-del-param]'); if (del) del.onclick = () => { syncEditorParams(); window.__editorParams.splice(i, 1); renderEditorParams(); };
+    const goodInput = box.querySelector('[data-pgood]'), goodPreview = box.querySelector('[data-preview-good]');
+    if (goodInput) goodInput.oninput = () => { goodPreview.textContent = goodInput.value.trim() || 'Conforme'; };
+    const toggleGood = box.querySelector('[data-toggle-good]'), goodCustom = box.querySelector('[data-good-custom]');
+    if (toggleGood) toggleGood.onclick = () => { toggleGood.classList.add('hidden'); goodCustom.classList.remove('hidden'); goodInput.focus(); };
+
+    const addOpt = box.querySelector('[data-opt-add]');
+    if (addOpt) addOpt.onclick = () => {
+      syncEditorParams();
+      const p = window.__editorParams[i];
+      p.options.push('Opção ' + (p.options.length + 1));
+      renderEditorParams();
+    };
+    box.querySelectorAll('[data-opt-del]').forEach((b, oi) => b.onclick = () => {
+      syncEditorParams();
+      const p = window.__editorParams[i];
+      const removed = p.options.splice(oi, 1)[0];
+      p.ncOptions = (p.ncOptions || []).filter(o => o !== removed);
+      renderEditorParams();
+    });
+    box.querySelectorAll('[data-opt-nc]').forEach((b, oi) => b.onclick = () => {
+      syncEditorParams();
+      const p = window.__editorParams[i];
+      const val = p.options[oi];
+      p.ncOptions = p.ncOptions || [];
+      const k = p.ncOptions.indexOf(val);
+      if (k >= 0) p.ncOptions.splice(k, 1); else p.ncOptions.push(val);
+      renderEditorParams();
+    });
   });
 }
 
@@ -162,8 +357,22 @@ export function syncEditorParams() {
   document.querySelectorAll('#ed-params [data-pidx]').forEach(box => {
     const i = +box.dataset.pidx, p = window.__editorParams[i];
     p.name = box.querySelector('[data-pname]').value;
-    if (p.type === 'numeric') { p.min = parseFloat(box.querySelector('[data-pmin]').value) || 0; p.max = parseFloat(box.querySelector('[data-pmax]').value) || 0; p.unit = box.querySelector('[data-punit]').value; p.step = 0.1; p.seed = p.min; }
-    else { p.good = box.querySelector('[data-pgood]').value || 'Conforme'; }
+    if (p.type === 'numeric') {
+      p.min = parseFloat(box.querySelector('[data-pmin]').value) || 0; p.max = parseFloat(box.querySelector('[data-pmax]').value) || 0;
+      p.unit = box.querySelector('[data-punit]').value; p.step = parseFloat(box.querySelector('[data-pstep]').value) || 0.1; p.seed = p.min;
+    } else if (p.type === 'numero') {
+      p.unit = box.querySelector('[data-punit]').value; p.step = parseFloat(box.querySelector('[data-pstep]').value) || 1; p.seed = 0;
+    } else if (p.type === 'escolha') {
+      const oldOptions = p.options || [];
+      const rows = [...box.querySelectorAll('[data-opt-row]')];
+      const newOptions = rows.map(r => r.querySelector('[data-opt-val]').value.trim() || 'Opção');
+      // remapeia quais estavam marcadas "não conforme" pro novo texto da mesma posição
+      p.ncOptions = (p.ncOptions || []).map(nc => { const idx = oldOptions.indexOf(nc); return idx >= 0 && newOptions[idx] ? newOptions[idx] : nc; }).filter(nc => newOptions.includes(nc));
+      p.options = newOptions;
+    } else if (p.type === 'qualitative') {
+      p.good = box.querySelector('[data-pgood]').value || 'Conforme';
+    }
+    // texto, simnao, data e hora não têm campos extras além do título
   });
 }
 
@@ -184,7 +393,8 @@ export async function saveFormEditor() {
   const editing = params.form ? getForm(params.form) : null;
   const loc = $('ed-loc').value.trim() || 'A definir';
   const pac = editing ? getPac(editing.pacId) : getPac(params.pac || DB.pacs[0].id);
-  const payload = { pacId: pac.id, title, due, schedule, days, times, location: loc, params: window.__editorParams };
+  const toleranceMin = w.type === 'fixos' ? (w.toleranceMin || 0) : 0;
+  const payload = { pacId: pac.id, title, due, schedule, days, times, location: loc, params: window.__editorParams, toleranceMin };
 
   const btn = document.querySelector('[data-action="save-form"]');
   if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
@@ -204,4 +414,29 @@ export async function saveFormEditor() {
   } finally {
     if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); }
   }
+}
+
+export function confirmDeleteForm(id) {
+  const f = getForm(id); if (!f) return;
+  $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-center justify-center p-4" data-close-modal>
+    <div class="absolute inset-0 bg-black/40" data-close-modal></div>
+    <div class="relative bg-surface-container-lowest rounded-2xl w-full max-w-[380px] shadow-2xl p-5">
+      <div class="flex items-center gap-2 mb-2">${icon('delete', 'text-error text-[24px]', true)}<div class="font-semibold text-on-surface text-[16px]">Excluir ${esc(f.title)}?</div></div>
+      <p class="text-[13px] text-on-surface-variant mb-4">Só é possível excluir planilhas sem nenhum registro. Se já houver histórico, desative-a em vez de excluir.</p>
+      <div class="flex gap-2">
+        <button data-action="close-x" class="tap flex-1 bg-surface-container text-on-surface rounded-xl py-3 font-semibold text-[14px]">Cancelar</button>
+        <button data-action="del-form-confirm" data-form="${f.id}" class="tap flex-1 bg-error text-on-error rounded-xl py-3 font-semibold text-[14px]">Excluir</button>
+      </div>
+    </div></div>`;
+}
+
+export async function deleteFormConfirmed(id) {
+  const f = getForm(id); const pacId = f ? f.pacId : null;
+  try {
+    await api.deleteForm(id);
+    await api.refreshState();
+    closeModal();
+    toast('Planilha excluída.');
+    navigate('ge_pac_forms', { pac: pacId });
+  } catch (e) { toast(e.message || 'Não foi possível excluir.', 'err'); }
 }

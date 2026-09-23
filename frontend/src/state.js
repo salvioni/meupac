@@ -19,10 +19,25 @@ export function pacOf(formId) { const f = getForm(formId); return f ? getPac(f.p
 export function subsFor(formId) { return DB.submissions.filter(s => s.formId === formId); }
 export function todaySubFor(formId) { return subsFor(formId).find(s => isToday(s.ts)); }
 
+// prazo real (em minutos desde 00:00) da planilha hoje — usa o(s) horário(s) fixos
+// definidos (ou o "due" legado); o app só rastreia 1 envio/dia, então o prazo é o
+// ÚLTIMO horário do dia. Sem horário definido (sob demanda, N vezes, etc.), retorna null.
+export function dueMinutesToday(f) {
+  const times = (f.times && f.times.length) ? f.times : (f.due ? [f.due] : []);
+  if (!times.length) return null;
+  const mins = times.map(t => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); }).filter(n => !Number.isNaN(n));
+  return mins.length ? Math.max(...mins) : null;
+}
+
 export function formStatus(f) {
   const sub = todaySubFor(f.id);
   if (sub) return sub.occurrence ? 'ocorrencia' : 'concluido';
-  return f.defaultStatus === 'concluido' ? 'afazer' : f.defaultStatus;
+  if (f.schedule && f.schedule.type === 'demanda') return 'afazer';
+  const dueMin = dueMinutesToday(f);
+  if (dueMin === null) return f.defaultStatus === 'concluido' ? 'afazer' : f.defaultStatus;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  return nowMin > dueMin + (f.toleranceMin || 0) ? 'atrasado' : 'afazer';
 }
 
 export function daysLabel(days) {
@@ -45,11 +60,13 @@ export function dueText(f) {
   return (ts.length ? 'às ' + ts.join(', ') : 'Sem horário específico') + ' · ' + daysLabel(f.days);
 }
 
-export function formOwner(f) { return f.operatorId || null; }
-export function visibleToOperator(f, uid) { const o = formOwner(f); return o === null || o === uid; }
+export function formOwnerIds(f) { return f.operatorIds || []; }
+export function visibleToOperator(f, uid) { const ids = formOwnerIds(f); return ids.length === 0 || ids.includes(uid); }
 export function pacActive(p) { return p && p.active !== false; }
+export function formActive(f) { return f && f.active !== false; }
 export function getUnidade() { return DB.unidade || {}; }
-export function ownerName(f) { const id = formOwner(f); if (!id) return 'Não atribuída'; const u = (DB.team || []).find(t => t.id === id); return u ? u.name : '—'; }
+export function formOwners(f) { return formOwnerIds(f).map(id => (DB.team || []).find(t => t.id === id)).filter(Boolean); }
+export function ownerName(f) { const names = formOwners(f).map(u => u.name); return names.length ? names.join(', ') : '—'; }
 
 export function isTitular(t) { return !!(t && t.titular); }
 export function canManage(t) {

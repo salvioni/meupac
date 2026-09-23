@@ -76,9 +76,12 @@ de exemplo abaixo.
 Variáveis de ambiente (opcionais, ver `backend/.env.example`):
 
 - `PORT` — porta do servidor (padrão `8787`).
-- `JWT_SECRET` — segredo de assinatura dos tokens. **Defina um valor forte em
-  produção**; sem isso o servidor usa um segredo de desenvolvimento e avisa no
-  console.
+- `JWT_SECRET` — segredo de assinatura dos tokens. **Obrigatório em produção**
+  (`NODE_ENV=production`): sem ele o servidor se recusa a iniciar. Fora de
+  produção, um segredo aleatório é gerado a cada execução — funciona, mas todo
+  mundo precisa logar de novo quando o servidor reinicia.
+- `MEUPAC_DB` — caminho do arquivo SQLite (padrão `backend/data/meupac.sqlite`).
+  Útil pra rodar uma instância de teste sem tocar nos dados reais.
 
 ## Login (dados de exemplo)
 

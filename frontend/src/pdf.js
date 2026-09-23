@@ -116,7 +116,7 @@ export function exportRecordPdf(subId, submissions) {
 
 function csvCell(v) { v = String(v == null ? '' : v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
 export function exportHistCsv(subs) {
-  const head = ['Data', 'Hora', 'PAC', 'Codigo', 'Planilha', 'Revisao', 'Operador', 'Conforme', 'Ocorrencia', 'Assinado por', 'Assinado em', 'Hash'];
+  const head = ['Data', 'Hora', 'PAC', 'Codigo', 'Planilha', 'Revisao', 'Operador', 'Conforme', 'Nao Conformidade', 'Assinado por', 'Assinado em', 'Hash'];
   const lines = [head.join(';')];
   subs.forEach(s => {
     const f = getForm(s.formId), pac = getPac(f.pacId); const d = new Date(s.ts);

@@ -8,8 +8,8 @@ export function logo(size = 'text-2xl') {
 export function topbar(right) {
   return `<header class="shrink-0 z-30 bg-surface/90 backdrop-blur border-b border-outline-variant/40 pt-safe">
     <div class="flex items-center justify-between px-4 h-14">
-      ${logo('text-[18px]')}
-      <div class="flex items-center gap-3">${right || ''}</div>
+      <span class="md:hidden">${logo('text-[18px]')}</span>
+      <div class="flex items-center gap-3 md:ml-auto">${right || ''}</div>
     </div></header>`;
 }
 export function avatarBtn() {
@@ -24,7 +24,7 @@ export function profileTrigger() {
    </button>`;
 }
 export function bottomNav(items, active) {
-  return `<nav class="shrink-0 z-30 bg-surface-container-lowest border-t border-outline-variant/50 pb-safe">
+  return `<nav class="md:hidden shrink-0 z-30 bg-surface-container-lowest border-t border-outline-variant/50 pb-safe">
     <div class="grid grid-cols-${items.length} px-1">
       ${items.map(it => { const on = it.key === active; return `<button data-action="nav" data-nav="${it.key}" class="tap flex flex-col items-center gap-0.5 py-2.5">
         <span class="material-symbols-outlined text-[24px] ${on ? 'ms-fill text-primary' : 'text-on-surface-variant'}" ${on ? `style="background:#dfe9fb;border-radius:16px;padding:2px 16px"` : ''}>${it.icon}</span>
@@ -32,11 +32,27 @@ export function bottomNav(items, active) {
       </button>`; }).join('')}
     </div></nav>`;
 }
+// mesma navegação da bottomNav, só que como sidebar fixa — é pra onde a barra de
+// baixo "muda de lugar" quando a tela é larga o suficiente pra parecer um site.
+function sidebarNav(items, active) {
+  return `<aside class="hidden md:flex md:flex-col md:w-60 md:flex-none md:h-full border-r border-outline-variant/40 bg-surface-container-lowest">
+    <div class="h-16 flex items-center px-6 flex-none">${logo('text-[18px]')}</div>
+    <nav class="flex-1 px-3 space-y-1 overflow-y-auto scroll-area">
+      ${items.map(it => { const on = it.key === active; return `<button data-action="nav" data-nav="${it.key}" class="tap w-full flex items-center gap-3 px-3 py-2.5 rounded-lg ${on ? 'bg-inverse-primary text-primary font-semibold' : 'text-on-surface-variant'}">
+        <span class="material-symbols-outlined ${on ? 'ms-fill' : ''} text-[22px]">${it.icon}</span>
+        <span class="text-[14px]">${it.label}</span>
+      </button>`; }).join('')}
+    </nav>
+  </aside>`;
+}
 export function shell(inner, navItems, active, right) {
-  return `<div class="flex flex-col h-full">
-    ${topbar(right)}
-    <main id="screen-scroll" class="flex-1 overflow-y-auto scroll-area ${window.__noAnim ? '' : 'screen-enter'}">${inner}</main>
-    ${bottomNav(navItems, active)}
+  return `<div class="flex flex-col md:flex-row h-full">
+    ${sidebarNav(navItems, active)}
+    <div class="flex flex-col flex-1 min-w-0 h-full">
+      ${topbar(right)}
+      <main id="screen-scroll" class="flex-1 overflow-y-auto scroll-area ${window.__noAnim ? '' : 'screen-enter'}"><div class="md:max-w-[560px] md:mx-auto">${inner}</div></main>
+      ${bottomNav(navItems, active)}
+    </div>
   </div>`;
 }
 export function statusChip(st, extra = '') {
@@ -49,7 +65,7 @@ export function secHead(title, n) { return `<p class="mono text-[10px] uppercase
 // card único de planilha/registro: ícone · título · meta(operador · horário) · ação à direita; faixa vermelha = ocorrência
 export function pcard(o) {
   const occ = !!o.occ;
-  return `<div ${o.open || ''} class="tap w-full flex items-center gap-3 bg-surface-container-lowest border ${occ ? 'border-l-4 border-l-nc-bd ' : ''}border-outline-variant/60 rounded-xl px-3.5 py-3 text-left">
+  return `<div ${o.open || ''} class="${o.open ? 'tap ' : ''}w-full flex items-center gap-3 bg-surface-container-lowest border ${occ ? 'border-l-4 border-l-nc-bd ' : ''}border-outline-variant/60 rounded-xl px-3.5 py-3 text-left">
     <span class="w-9 h-9 rounded-lg ${occ ? 'bg-nc-bg' : 'bg-surface-container'} flex items-center justify-center flex-none">${icon(o.icon, (occ ? 'text-nc-tx' : 'text-primary') + ' text-[20px]', true)}</span>
     <div class="flex-1 min-w-0">
       <div class="font-medium text-on-surface text-[14px] truncate">${esc(o.title)}</div>

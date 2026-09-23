@@ -29,6 +29,12 @@ app.use('/api/team', teamRouter);
 app.use('/api/unidade', unidadeRouter);
 app.use('/api/audit', auditRouter);
 
+// a raiz é a landing page de marketing (fora do app); o app em si mora em /app
+// e em qualquer outra rota de cliente — nenhuma delas é um arquivo real no disco.
+app.get('/', (req, res) => {
+  res.sendFile(join(frontendDir, 'landing.html'));
+});
+
 app.use(express.static(frontendDir));
 app.get(/^(?!\/api\/).*/, (req, res) => {
   res.sendFile(join(frontendDir, 'index.html'));

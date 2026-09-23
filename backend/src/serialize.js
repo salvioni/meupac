@@ -1,6 +1,14 @@
 // Conversão linha-do-banco -> objeto JSON no mesmo formato que o frontend já espera
 // (o mesmo "shape" do antigo objeto DB em localStorage), pra minimizar mudanças na UI.
 
+import { db } from './db.js';
+
+// uma planilha pode ter vários operadores autorizados; sem nenhum vínculo, ela fica
+// aberta a todos os operadores (como um PAC sem restrição extra de acesso).
+export function formOperatorIds(formId) {
+  return db.prepare('SELECT operator_id FROM form_operators WHERE form_id = ?').all(formId).map(r => r.operator_id);
+}
+
 export function formOut(f) {
   return {
     id: f.id, pacId: f.pac_id, plNum: f.pl_num, rev: f.rev, revDate: f.rev_date,
@@ -9,12 +17,13 @@ export function formOut(f) {
     days: f.days_json ? JSON.parse(f.days_json) : [],
     times: f.times_json ? JSON.parse(f.times_json) : [],
     location: f.location, sector: f.sector, defaultStatus: f.default_status,
-    params: JSON.parse(f.params_json), operatorId: f.operator_id,
+    toleranceMin: f.tolerance_min || 0, active: !!f.active,
+    params: JSON.parse(f.params_json), operatorIds: formOperatorIds(f.id),
   };
 }
 
 export function pacOut(p) {
-  return { id: p.id, code: p.code, name: p.name, icon: p.icon, norm: p.norm, active: !!p.active };
+  return { id: p.id, code: p.code, name: p.name, icon: p.icon, norm: p.norm, description: p.description || '', active: !!p.active };
 }
 
 export function submissionOut(s) {
@@ -44,5 +53,6 @@ export function teamMemberOut(u) {
 }
 
 export function visibleToOperator(form, uid) {
-  return form.operator_id === null || form.operator_id === uid;
+  const ids = formOperatorIds(form.id);
+  return ids.length === 0 || ids.includes(uid);
 }

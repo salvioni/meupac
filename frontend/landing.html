@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>meuPAC — Programas de Autocontrole digitais, à prova de auditoria</title>
+<meta name="description" content="Substitua as planilhas de papel dos Programas de Autocontrole (PAC) por registros digitais assinados, rastreáveis e organizados exatamente como o RIISPOA exige.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=block" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      surface:'#f8f9ff', ink:'#0f2642',
+      primary:'#0f2642', 'on-primary':'#ffffff', 'inverse-primary':'#b2c8eb',
+      secondary:'#176b48', 'on-secondary':'#ffffff', 'secondary-container':'#a1f1c3',
+      'on-surface':'#121c29', 'on-surface-variant':'#44474d',
+      outline:'#74777e', 'outline-variant':'#c4c6ce',
+      'surface-container':'#e5eeff', 'surface-container-low':'#eff4ff', 'surface-container-high':'#dfe9fb',
+      'conf-bg':'#e6f4ea', 'conf-tx':'#135237',
+      'pend-bg':'#fef3c7', 'pend-tx':'#8a4505',
+      'nc-bg':'#fee2e2', 'nc-tx':'#991b1b',
+    },
+    fontFamily: {
+      sans: ['Hanken Grotesk','ui-sans-serif','system-ui','sans-serif'],
+      mono: ['JetBrains Mono','ui-monospace','monospace'],
+      brand: ['Unbounded','Hanken Grotesk','sans-serif'],
+    },
+  } }
+}
+</script>
+<style>
+  html{scroll-behavior:smooth;}
+  body{font-family:'Hanken Grotesk',sans-serif;-webkit-font-smoothing:antialiased;background:#f8f9ff;color:#121c29;margin:0;}
+  .material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;vertical-align:middle;}
+  .ms-fill{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .font-brand{font-family:'Unbounded','Hanken Grotesk',sans-serif;}
+  .glow{position:absolute;border-radius:9999px;filter:blur(70px);z-index:0;pointer-events:none;}
+  .btn{transition:transform .15s ease, box-shadow .15s ease, background-color .15s ease;}
+  .btn:hover{transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+  .reveal{animation:rise .6s cubic-bezier(.22,.61,.36,1) both;}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+  .phone-shell{box-shadow:0 40px 80px -30px rgba(15,38,66,.45), 0 0 0 1px rgba(15,38,66,.06);}
+</style>
+</head>
+<body class="antialiased">
+
+<header class="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-outline-variant/40">
+  <div class="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+    <span class="font-brand text-[18px] tracking-tight"><span class="text-secondary">meu</span><span class="text-primary">PAC</span></span>
+    <nav class="hidden md:flex items-center gap-8 text-[14px] font-semibold text-on-surface-variant">
+      <a href="#recursos" class="hover:text-on-surface">Recursos</a>
+      <a href="#como-funciona" class="hover:text-on-surface">Como funciona</a>
+      <a href="#seguranca" class="hover:text-on-surface">Segurança</a>
+    </nav>
+    <div class="flex items-center gap-2">
+      <a href="/app" class="text-[13px] sm:text-[14px] font-semibold text-on-surface px-2 sm:px-3 py-2">Entrar</a>
+      <a href="/app?signup=1" class="btn bg-primary text-on-primary text-[13px] sm:text-[14px] font-semibold px-4 py-2.5 rounded-lg">Cadastrar empresa</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- HERO -->
+  <section class="relative overflow-hidden">
+    <div class="glow w-[520px] h-[520px] bg-inverse-primary/50 -top-40 -right-32"></div>
+    <div class="glow w-[420px] h-[420px] bg-secondary-container/40 top-40 -left-40"></div>
+    <div class="relative max-w-6xl mx-auto px-5 sm:px-8 pt-14 sm:pt-20 pb-16 sm:pb-24 grid md:grid-cols-2 gap-12 items-center">
+      <div class="reveal">
+        <span class="mono inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-primary bg-inverse-primary/60 px-3 py-1.5 rounded-full"><span class="material-symbols-outlined text-[14px]">verified</span>Programas de Autocontrole · MAPA/SIF</span>
+        <h1 class="font-brand text-[34px] sm:text-[46px] leading-[1.12] font-bold text-on-surface mt-5">Sua fábrica nunca mais vai <span class="text-secondary">temer uma auditoria.</span></h1>
+        <p class="text-[16px] sm:text-[18px] text-on-surface-variant mt-5 max-w-[480px]">Troque as planilhas de papel dos seus PACs por registros digitais assinados e rastreáveis — cada operador assina o próprio registro, o RT valida, e nenhuma edição retroativa passa despercebida.</p>
+        <div class="flex flex-col sm:flex-row gap-3 mt-8">
+          <a href="/app?signup=1" class="btn bg-primary text-on-primary font-semibold px-6 py-3.5 rounded-xl text-center flex items-center justify-center gap-2"><span class="material-symbols-outlined">add_business</span>Cadastrar minha empresa</a>
+          <a href="/app" class="btn bg-white text-on-surface border border-outline-variant font-semibold px-6 py-3.5 rounded-xl text-center flex items-center justify-center gap-2"><span class="material-symbols-outlined">login</span>Já tenho conta</a>
+        </div>
+        <p class="text-[12px] text-on-surface-variant mt-4">Cadastro leva menos de 1 minuto — você vira o administrador da sua unidade na hora.</p>
+      </div>
+
+      <div class="reveal flex justify-center md:justify-end" style="animation-delay:.1s">
+        <div class="phone-shell w-[260px] rounded-[32px] bg-white p-3 rotate-[2deg]">
+          <div class="rounded-[22px] overflow-hidden bg-surface">
+            <div class="px-4 pt-4 pb-3 flex items-center justify-between">
+              <span class="font-brand text-[13px]"><span class="text-secondary">meu</span><span class="text-primary">PAC</span></span>
+              <span class="w-6 h-6 rounded-full bg-inverse-primary"></span>
+            </div>
+            <div class="px-4 pb-2">
+              <div class="text-[15px] font-bold text-on-surface leading-tight">Painel de Hoje</div>
+              <div class="grid grid-cols-2 gap-1.5 mt-2">
+                <div class="bg-nc-bg rounded-lg p-2"><div class="text-[9px] mono uppercase text-nc-tx opacity-80">Não Conformes</div><div class="text-[18px] font-bold text-nc-tx">01</div></div>
+                <div class="bg-inverse-primary rounded-lg p-2"><div class="text-[9px] mono uppercase text-primary opacity-80">A Assinar</div><div class="text-[18px] font-bold text-primary">02</div></div>
+                <div class="bg-conf-bg rounded-lg p-2"><div class="text-[9px] mono uppercase text-conf-tx opacity-80">Conformes</div><div class="text-[18px] font-bold text-conf-tx">06</div></div>
+                <div class="bg-surface-container-high rounded-lg p-2"><div class="text-[9px] mono uppercase text-on-surface-variant">A Preencher</div><div class="text-[18px] font-bold text-on-surface-variant">03</div></div>
+              </div>
+              <div class="mt-3 space-y-1.5">
+                <div class="bg-white border border-outline-variant/50 rounded-lg px-2.5 py-2 flex items-center gap-2">
+                  <span class="w-6 h-6 rounded-md bg-surface-container flex items-center justify-center flex-none"><span class="material-symbols-outlined text-[13px] text-primary">water_drop</span></span>
+                  <div class="flex-1 min-w-0"><div class="text-[10px] font-semibold text-on-surface truncate">Cloro e pH da Água</div><div class="text-[8px] text-on-surface-variant">João Silva às 09:02</div></div>
+                  <span class="material-symbols-outlined text-[13px] text-on-surface-variant">chevron_right</span>
+                </div>
+                <div class="bg-white border border-outline-variant/50 rounded-lg px-2.5 py-2 flex items-center gap-2">
+                  <span class="w-6 h-6 rounded-md bg-surface-container flex items-center justify-center flex-none"><span class="material-symbols-outlined text-[13px] text-primary">thermostat</span></span>
+                  <div class="flex-1 min-w-0"><div class="text-[10px] font-semibold text-on-surface truncate">Câmaras Frias</div><div class="text-[8px] text-on-surface-variant">Carlos Mendes às 14:05</div></div>
+                  <span class="mono text-[7px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary text-on-primary flex-none">Assinar</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAT STRIP -->
+  <section class="border-y border-outline-variant/40 bg-white/60">
+    <div class="max-w-6xl mx-auto px-5 sm:px-8 py-8 grid grid-cols-3 gap-4 text-center">
+      <div><div class="font-brand text-[24px] sm:text-[30px] font-bold text-primary">15</div><div class="text-[11px] sm:text-[12px] text-on-surface-variant mt-1">PACs padrão RIISPOA já prontos</div></div>
+      <div><div class="font-brand text-[24px] sm:text-[30px] font-bold text-primary">100%</div><div class="text-[11px] sm:text-[12px] text-on-surface-variant mt-1">assinatura digital, sem papel</div></div>
+      <div><div class="font-brand text-[24px] sm:text-[30px] font-bold text-primary">0</div><div class="text-[11px] sm:text-[12px] text-on-surface-variant mt-1">edições retroativas sem deixar rastro</div></div>
+    </div>
+  </section>
+
+  <!-- RECURSOS -->
+  <section id="recursos" class="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
+    <div class="max-w-xl">
+      <span class="mono text-[11px] font-semibold uppercase tracking-widest text-secondary">Recursos</span>
+      <h2 class="font-brand text-[28px] sm:text-[34px] font-bold text-on-surface mt-2">Tudo que a inspeção precisa ver, num só lugar.</h2>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-10">
+      <div class="bg-white border border-outline-variant/50 rounded-2xl p-6">
+        <span class="w-11 h-11 rounded-xl bg-inverse-primary flex items-center justify-center"><span class="material-symbols-outlined text-primary">draw</span></span>
+        <h3 class="font-semibold text-[16px] text-on-surface mt-4">Assinatura digital de verdade</h3>
+        <p class="text-[13px] text-on-surface-variant mt-1.5">Cada operador assina o próprio registro no ato do preenchimento; o gestor/RT valida depois. Sem caneta, sem prancheta perdida.</p>
+      </div>
+      <div class="bg-white border border-outline-variant/50 rounded-2xl p-6">
+        <span class="w-11 h-11 rounded-xl bg-secondary-container flex items-center justify-center"><span class="material-symbols-outlined text-secondary">verified_user</span></span>
+        <h3 class="font-semibold text-[16px] text-on-surface mt-4">Trilha de auditoria inquebrável</h3>
+        <p class="text-[13px] text-on-surface-variant mt-1.5">Uma cadeia de hashes encadeia cada registro assinado — alterar ou apagar algo antigo quebra a cadeia e é detectável na hora.</p>
+      </div>
+      <div class="bg-white border border-outline-variant/50 rounded-2xl p-6">
+        <span class="w-11 h-11 rounded-xl bg-pend-bg flex items-center justify-center"><span class="material-symbols-outlined text-pend-tx">checklist</span></span>
+        <h3 class="font-semibold text-[16px] text-on-surface mt-4">Organizado por PAC</h3>
+        <p class="text-[13px] text-on-surface-variant mt-1.5">Os 15 Programas de Autocontrole do RIISPOA já vêm prontos, com descrição do que cada um deve cobrir — ative só os que sua unidade usa.</p>
+      </div>
+      <div class="bg-white border border-outline-variant/50 rounded-2xl p-6">
+        <span class="w-11 h-11 rounded-xl bg-inverse-primary flex items-center justify-center"><span class="material-symbols-outlined text-primary">schedule</span></span>
+        <h3 class="font-semibold text-[16px] text-on-surface mt-4">Prazo e atraso em tempo real</h3>
+        <p class="text-[13px] text-on-surface-variant mt-1.5">Cada planilha sabe seu horário e tolerância — o painel mostra na hora o que está atrasado, sem depender de ninguém avisar.</p>
+      </div>
+      <div class="bg-white border border-outline-variant/50 rounded-2xl p-6">
+        <span class="w-11 h-11 rounded-xl bg-conf-bg flex items-center justify-center"><span class="material-symbols-outlined text-conf-tx">group</span></span>
+        <h3 class="font-semibold text-[16px] text-on-surface mt-4">Acesso por papel, não por confiança</h3>
+        <p class="text-[13px] text-on-surface-variant mt-1.5">Operador só vê e preenche o que foi autorizado; só gestor assina, publica planilhas e gerencia a equipe. Tudo validado no servidor.</p>
+      </div>
+      <div class="bg-white border border-outline-variant/50 rounded-2xl p-6">
+        <span class="w-11 h-11 rounded-xl bg-secondary-container flex items-center justify-center"><span class="material-symbols-outlined text-secondary">domain</span></span>
+        <h3 class="font-semibold text-[16px] text-on-surface mt-4">Sua empresa, isolada</h3>
+        <p class="text-[13px] text-on-surface-variant mt-1.5">Cada unidade cadastrada tem seus próprios dados, planilhas e cadeia de auditoria — nada se mistura com o de outra empresa.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMO FUNCIONA -->
+  <section id="como-funciona" class="bg-surface-container-low border-y border-outline-variant/40">
+    <div class="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
+      <div class="max-w-xl">
+        <span class="mono text-[11px] font-semibold uppercase tracking-widest text-secondary">Como funciona</span>
+        <h2 class="font-brand text-[28px] sm:text-[34px] font-bold text-on-surface mt-2">Do papel pro digital em três passos.</h2>
+      </div>
+      <div class="grid md:grid-cols-3 gap-8 mt-12">
+        <div>
+          <div class="mono text-[13px] font-bold text-primary">01</div>
+          <h3 class="font-semibold text-[16px] text-on-surface mt-2">Cadastre sua empresa</h3>
+          <p class="text-[13px] text-on-surface-variant mt-1.5">Em menos de um minuto você cria sua unidade e vira o administrador — os 15 PACs padrão já entram prontos.</p>
+        </div>
+        <div>
+          <div class="mono text-[13px] font-bold text-primary">02</div>
+          <h3 class="font-semibold text-[16px] text-on-surface mt-2">Convide sua equipe</h3>
+          <p class="text-[13px] text-on-surface-variant mt-1.5">Adicione operadores e gestores, e autorize cada um só nas planilhas que fazem parte do turno dele.</p>
+        </div>
+        <div>
+          <div class="mono text-[13px] font-bold text-primary">03</div>
+          <h3 class="font-semibold text-[16px] text-on-surface mt-2">Registre e assine</h3>
+          <p class="text-[13px] text-on-surface-variant mt-1.5">O operador preenche e assina na hora certa; o gestor valida. Tudo já fica pronto pra exportar quando a inspeção pedir.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEGURANÇA -->
+  <section id="seguranca" class="bg-primary text-white">
+    <div class="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28 grid md:grid-cols-2 gap-12 items-center">
+      <div>
+        <span class="mono text-[11px] font-semibold uppercase tracking-widest text-inverse-primary">Segurança e integridade</span>
+        <h2 class="font-brand text-[28px] sm:text-[34px] font-bold mt-2">Um registro assinado não pode simplesmente ser "corrigido" depois.</h2>
+        <p class="text-[15px] text-white/70 mt-4 max-w-[440px]">É esse o problema real do papel — e de planilhas soltas. No meuPAC, cada registro carrega o hash do anterior. Editar ou apagar algo antigo, mesmo direto no banco, quebra a cadeia de tudo que veio depois — e isso é conferível a qualquer momento.</p>
+      </div>
+      <div class="space-y-3">
+        <div class="bg-white/10 border border-white/15 rounded-xl p-4 flex items-center gap-3">
+          <span class="material-symbols-outlined text-inverse-primary">lock</span>
+          <span class="text-[14px] font-medium">Login individual com senha própria (bcrypt)</span>
+        </div>
+        <div class="bg-white/10 border border-white/15 rounded-xl p-4 flex items-center gap-3">
+          <span class="material-symbols-outlined text-inverse-primary">link</span>
+          <span class="text-[14px] font-medium">Cadeia de hashes sha256 sobre cada registro assinado</span>
+        </div>
+        <div class="bg-white/10 border border-white/15 rounded-xl p-4 flex items-center gap-3">
+          <span class="material-symbols-outlined text-inverse-primary">domain_verification</span>
+          <span class="text-[14px] font-medium">Cada empresa isolada, com sua própria trilha de auditoria</span>
+        </div>
+        <div class="bg-white/10 border border-white/15 rounded-xl p-4 flex items-center gap-3">
+          <span class="material-symbols-outlined text-inverse-primary">history</span>
+          <span class="text-[14px] font-medium">Toda edição de planilha arquiva a versão anterior, nunca sobrescreve</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA FINAL -->
+  <section class="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28 text-center">
+    <h2 class="font-brand text-[28px] sm:text-[36px] font-bold text-on-surface max-w-2xl mx-auto">Pronto pra tirar seus PACs do papel?</h2>
+    <p class="text-[15px] text-on-surface-variant mt-3 max-w-md mx-auto">Cadastre sua empresa agora e comece a assinar digitalmente ainda hoje.</p>
+    <a href="/app?signup=1" class="btn inline-flex items-center gap-2 bg-primary text-on-primary font-semibold px-7 py-4 rounded-xl mt-7"><span class="material-symbols-outlined">add_business</span>Cadastrar minha empresa</a>
+  </section>
+</main>
+
+<footer class="border-t border-outline-variant/40">
+  <div class="max-w-6xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+    <span class="font-brand text-[15px]"><span class="text-secondary">meu</span><span class="text-primary">PAC</span></span>
+    <p class="text-[12px] text-on-surface-variant">Programas de Autocontrole · MAPA/SIF — controle de qualidade sem papel.</p>
+  </div>
+</footer>
+
+</body>
+</html>

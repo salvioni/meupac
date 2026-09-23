@@ -57,13 +57,20 @@ tailwind.config = {
   .fade-in{animation:fadeIn .2s ease;}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
-  /* phone frame */
-  #frame{max-width:430px;margin:0 auto;height:100dvh;background:#f8f9ff;position:relative;box-shadow:0 0 0 1px rgba(15,38,66,.06);}
+  /* base: só usada por uma fração de segundo antes do JS decidir web x app */
+  #frame{max-width:430px;margin:0 auto;height:100dvh;background:#f8f9ff;position:relative;}
   #app{height:100%;}
-  @media(min-width:520px){
-    body{padding:24px 0;}
-    #frame{height:calc(100dvh - 48px);border-radius:28px;overflow:hidden;box-shadow:0 24px 60px -20px rgba(15,38,66,.35),0 0 0 1px rgba(15,38,66,.08);}
-  }
+  /* pré-login: página web normal, sem moldura nenhuma, em qualquer largura */
+  #frame.web{max-width:none;height:auto;min-height:100dvh;margin:0;background:transparent;overflow:visible;}
+  #frame.web #app{height:auto;min-height:100dvh;}
+  body:has(#frame.web){padding:0;background:#f8f9ff;}
+  /* app autenticado: sempre em largura total, sem cartão/borda de celular em
+     nenhum tamanho de tela — no mobile já fica assim naturalmente (viewport
+     estreito); no desktop, a barra de baixo vira sidebar (ver ui.js#shell) mas
+     o "frame" em si nunca aparece como cartão flutuante centralizado */
+  body:has(#frame:not(.web)){padding:0;}
+  #frame:not(.web){max-width:none;width:100%;height:100dvh;margin:0;overflow:visible;}
+  .glow{position:absolute;border-radius:9999px;filter:blur(70px);z-index:0;pointer-events:none;}
   input:focus,select:focus,textarea:focus{outline:none;}
   .num-input::-webkit-outer-spin-button,.num-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   .num-input{-moz-appearance:textfield;}

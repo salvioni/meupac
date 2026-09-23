@@ -6,15 +6,16 @@ import { formOut, pacOut, submissionOut, unidadeOut, visibleToOperator } from '.
 export const stateRouter = Router();
 
 stateRouter.get('/', authenticate, (req, res) => {
-  const plant = db.prepare('SELECT name FROM plant WHERE id = 1').get();
-  const unidade = db.prepare('SELECT * FROM unidade WHERE id = 1').get();
-  const allPacs = db.prepare('SELECT * FROM pacs').all();
-  const allForms = db.prepare('SELECT * FROM forms').all();
+  const unidadeId = req.user.unidade_id;
+  const unidade = db.prepare('SELECT * FROM unidade WHERE id = ?').get(unidadeId);
+  const allPacs = db.prepare('SELECT * FROM pacs WHERE unidade_id = ?').all(unidadeId);
+  const allForms = db.prepare('SELECT * FROM forms WHERE unidade_id = ?').all(unidadeId);
+  const plant = unidade ? [unidade.razao_social, unidade.sif].filter(Boolean).join(' — ') : '';
 
   if (req.user.role === 'gerente') {
-    const submissions = db.prepare('SELECT * FROM submissions ORDER BY seq DESC').all();
+    const submissions = db.prepare('SELECT * FROM submissions WHERE unidade_id = ? ORDER BY seq DESC').all(unidadeId);
     return res.json({
-      plant: plant ? plant.name : '',
+      plant,
       pacs: allPacs.map(pacOut),
       forms: allForms.map(formOut),
       submissions: submissions.map(submissionOut),
@@ -27,11 +28,11 @@ stateRouter.get('/', authenticate, (req, res) => {
   const visibleForms = allForms.filter(f => visibleToOperator(f, req.user.id));
   const visibleFormIds = new Set(visibleForms.map(f => f.id));
   const visiblePacIds = new Set(visibleForms.map(f => f.pac_id));
-  const submissions = db.prepare('SELECT * FROM submissions ORDER BY seq DESC').all()
+  const submissions = db.prepare('SELECT * FROM submissions WHERE unidade_id = ? ORDER BY seq DESC').all(unidadeId)
     .filter(s => visibleFormIds.has(s.form_id));
 
   res.json({
-    plant: plant ? plant.name : '',
+    plant,
     pacs: allPacs.filter(p => visiblePacIds.has(p.id)).map(pacOut),
     forms: visibleForms.map(formOut),
     submissions: submissions.map(submissionOut),
