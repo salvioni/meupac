@@ -1,5 +1,5 @@
 import { $, esc, icon, fmtTime, isToday, toast } from '../helpers.js';
-import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, ownerName } from '../state.js';
+import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, ownerName, dueText } from '../state.js';
 import { shell, profileTrigger, pcard, secHead } from '../ui.js';
 import { GE_NAV, STATUS_META } from '../config.js';
 import * as api from '../api.js';
@@ -49,7 +49,7 @@ export function renderPainel() {
     const st = formStatus(f);
     return pcard({
       icon: getPac(f.pacId).icon, occ: false, title: f.title,
-      meta: `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">Previsto às ${f.due || '—'} · ${esc(ownerName(f))}</span>`,
+      meta: `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(dueText(f).split(' · ')[0])} · ${esc(ownerName(f))}</span>`,
       trailing: st === 'atrasado'
         ? `<span class="mono text-[10px] font-bold uppercase px-2 py-1 rounded ${STATUS_META.atrasado.bg} ${STATUS_META.atrasado.tx} flex-none">${STATUS_META.atrasado.label}</span>`
         : `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">No Prazo</span>`,

@@ -22,8 +22,16 @@ export function todaySubFor(formId) { return subsFor(formId).find(s => isToday(s
 // prazo real (em minutos desde 00:00) da planilha hoje — usa o(s) horário(s) fixos
 // definidos (ou o "due" legado); o app só rastreia 1 envio/dia, então o prazo é o
 // ÚLTIMO horário do dia. Sem horário definido (sob demanda, N vezes, etc.), retorna null.
+// horários fixos da planilha. Com frequência sem horário (a cada X horas, N vezes,
+// momentos, sob demanda) não há horário fixo — o "due" legado é ignorado nesse caso,
+// senão uma planilha "a cada 2 horas" aparecia como "às 09:00" e ficava atrasada às 9h.
+export function fixedTimes(f) {
+  if (f.schedule && f.schedule.type && f.schedule.type !== 'fixos') return [];
+  return (f.times && f.times.length) ? f.times : (f.due ? [f.due] : []);
+}
+
 export function dueMinutesToday(f) {
-  const times = (f.times && f.times.length) ? f.times : (f.due ? [f.due] : []);
+  const times = fixedTimes(f);
   if (!times.length) return null;
   const mins = times.map(t => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); }).filter(n => !Number.isNaN(n));
   return mins.length ? Math.max(...mins) : null;
@@ -34,7 +42,7 @@ export function formStatus(f) {
   if (sub) return sub.occurrence ? 'ocorrencia' : 'concluido';
   if (f.schedule && f.schedule.type === 'demanda') return 'afazer';
   const dueMin = dueMinutesToday(f);
-  if (dueMin === null) return f.defaultStatus === 'concluido' ? 'afazer' : f.defaultStatus;
+  if (dueMin === null) return 'afazer'; // sem horário fixo não há como estar atrasada
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
   return nowMin > dueMin + (f.toleranceMin || 0) ? 'atrasado' : 'afazer';
@@ -56,7 +64,7 @@ export function dueText(f) {
     else if (s.type === 'fixos' && s.times && s.times.length) when = 'às ' + s.times.join(', ');
     if (when) return when + ' · ' + daysLabel(s.days);
   }
-  const ts = (f.times && f.times.length) ? f.times : (f.due ? [f.due] : []);
+  const ts = fixedTimes(f);
   return (ts.length ? 'às ' + ts.join(', ') : 'Sem horário específico') + ' · ' + daysLabel(f.days);
 }
 

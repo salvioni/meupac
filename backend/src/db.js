@@ -215,6 +215,14 @@ function migrateFormOperators() {
   db.prepare('UPDATE forms SET operator_id = NULL WHERE operator_id IS NOT NULL').run();
 }
 
+// migração única: planilhas com frequência sem horário fixo (a cada X horas, momentos,
+// N vezes, sob demanda) não devem ter "due" — um valor antigo ali fazia o painel mostrar
+// "às 09:00" pra uma planilha "a cada 2 horas". Idempotente: só toca quem ainda tem due.
+function clearStaleDue() {
+  db.prepare(`UPDATE forms SET due = '' WHERE due != '' AND schedule_json IS NOT NULL
+    AND json_extract(schedule_json, '$.type') IS NOT NULL AND json_extract(schedule_json, '$.type') != 'fixos'`).run();
+}
+
 function seedIfEmpty() {
   const { count } = db.prepare('SELECT COUNT(*) as count FROM users').get();
   if (count > 0) return;
@@ -239,21 +247,21 @@ function seedIfEmpty() {
   const insForm = db.prepare(`INSERT INTO forms (id,unidade_id,pac_id,pl_num,rev,rev_date,title,due,schedule_json,days_json,times_json,location,sector,default_status,params_json,operator_id)
     VALUES (?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?)`);
   const revDate = isoAt(-30, 8, 0);
-  insForm.run('f_agua', unidadeId, 'pac02', 1, revDate, 'Cloro e pH da Água', '09:00', JSON.stringify({ type: 'intervalo', every: 2, unit: 'horas' }), null, null, 'Ponto 02 · Saída do Reservatório Central', 'Setor 04', 'atrasado',
+  insForm.run('f_agua', unidadeId, 'pac02', 1, revDate, 'Cloro e pH da Água', '', JSON.stringify({ type: 'intervalo', every: 2, unit: 'horas' }), null, null, 'Ponto 02 · Saída do Reservatório Central', 'Setor 04', 'atrasado',
     JSON.stringify([{ id: 'p_cl', type: 'numeric', name: 'Cloro Livre', unit: 'ppm', min: 0.5, max: 2.0, step: 0.1, seed: 1.8 },
       { id: 'p_ph', type: 'numeric', name: 'pH da Água', unit: 'pH', min: 6.0, max: 7.5, step: 0.1, seed: 7.2 },
       { id: 'p_asp', type: 'qualitative', name: 'Aspecto Sensorial', good: 'Límpida e Inodora' }]), 'u_joao');
   insForm.run('f_res', unidadeId, 'pac02', 2, revDate, 'Limpeza dos Reservatórios', '07:30', null, null, null, 'Reservatório Central (50.000L)', 'Setor 04', 'concluido',
     JSON.stringify([{ id: 'p_lav', type: 'qualitative', name: 'Lavagem e Desinfecção', good: 'Realizada' }, { id: 'p_vis', type: 'qualitative', name: 'Inspeção Visual Interna', good: 'Sem resíduos' }]), 'u_joao');
-  insForm.run('f_hig', unidadeId, 'pac04', 1, revDate, 'Higienização Pré-Operacional', '11:00', JSON.stringify({ type: 'momentos', moments: ['inicio'] }), null, null, 'Esteiras e mesas de processamento', 'Bloco B', 'pendente',
+  insForm.run('f_hig', unidadeId, 'pac04', 1, revDate, 'Higienização Pré-Operacional', '', JSON.stringify({ type: 'momentos', moments: ['inicio'] }), null, null, 'Esteiras e mesas de processamento', 'Bloco B', 'pendente',
     JSON.stringify([{ id: 'p_est', type: 'qualitative', name: 'Esteiras Sanitizadas', good: 'Conforme' }, { id: 'p_mes', type: 'qualitative', name: 'Mesas de Corte', good: 'Conforme' }, { id: 'p_utn', type: 'qualitative', name: 'Utensílios', good: 'Conforme' }]), 'u_joao');
   insForm.run('f_pias', unidadeId, 'pac04', 2, revDate, 'Higienização de Pias e Vestiários', '12:00', null, null, null, 'Vestiários e lavatórios', 'Bloco A', 'agendado',
     JSON.stringify([{ id: 'p_sab', type: 'qualitative', name: 'Reposição de Sabonete', good: 'Abastecido' }, { id: 'p_pap', type: 'qualitative', name: 'Papel Toalha', good: 'Abastecido' }]), 'u_joao');
-  insForm.run('f_cam', unidadeId, 'pac08', 1, revDate, 'Temperatura de Câmaras Frias', '14:00', JSON.stringify({ type: 'intervalo', every: 2, unit: 'horas' }), null, null, 'Câmaras de estocagem 01 e 03', 'Cadeia do Frio', 'afazer',
+  insForm.run('f_cam', unidadeId, 'pac08', 1, revDate, 'Temperatura de Câmaras Frias', '', JSON.stringify({ type: 'intervalo', every: 2, unit: 'horas' }), null, null, 'Câmaras de estocagem 01 e 03', 'Cadeia do Frio', 'afazer',
     JSON.stringify([{ id: 'p_c1', type: 'numeric', name: 'Câmara 01', unit: '°C', min: -1.0, max: 4.0, step: 0.1, seed: 2.1 }, { id: 'p_c3', type: 'numeric', name: 'Câmara 03', unit: '°C', min: -1.0, max: 4.0, step: 0.1, seed: 3.4 }]), 'u_carlos');
   insForm.run('f_term', unidadeId, 'pac08', 2, revDate, 'Verificação de Termômetros', '07:00', null, null, null, 'Sensores da cadeia do frio', 'Cadeia do Frio', 'concluido',
     JSON.stringify([{ id: 'p_cal', type: 'qualitative', name: 'Calibração conferida', good: 'Conforme' }]), 'u_carlos');
-  insForm.run('f_bar', unidadeId, 'pac05', 1, revDate, 'Inspeção de Barreira e Uniformes', '06:00', JSON.stringify({ type: 'momentos', moments: ['inicio'] }), null, null, 'Barreira sanitária de entrada', 'Bloco A', 'concluido',
+  insForm.run('f_bar', unidadeId, 'pac05', 1, revDate, 'Inspeção de Barreira e Uniformes', '', JSON.stringify({ type: 'momentos', moments: ['inicio'] }), null, null, 'Barreira sanitária de entrada', 'Bloco A', 'concluido',
     JSON.stringify([{ id: 'p_uni', type: 'qualitative', name: 'Uniformes Completos', good: 'Conforme' }, { id: 'p_ped', type: 'qualitative', name: 'Pedilúvio Abastecido', good: 'Conforme' }]), 'u_mariana');
   insForm.run('f_prag', unidadeId, 'pac03', 1, revDate, 'Monitoramento de Armadilhas e Iscas', '10:00', null, null, null, 'Perímetro e docas', 'Externo', 'afazer',
     JSON.stringify([{ id: 'p_arm', type: 'qualitative', name: 'Armadilhas Íntegras', good: 'Conforme' }, { id: 'p_isc', type: 'qualitative', name: 'Iscas Verificadas', good: 'Conforme' }]), 'u_mariana');
@@ -276,5 +284,6 @@ function seedIfEmpty() {
 
 seedIfEmpty();
 migrateFormOperators();
+clearStaleDue();
 backfillPacDescriptions();
 backfillUnidadeId();
