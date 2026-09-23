@@ -7,7 +7,7 @@ import { renderOpHist, renderGeHist, exportSheet, runExport } from './screens/hi
 import { renderPainel, sign, signAll } from './screens/painel.js';
 import { renderForms, renderPacForms, togglePacActive, toggleFormActive } from './screens/pacs.js';
 import { renderFormEditor, saveFormEditor, syncEditorParams, syncEditorTimes, renderEditorTimes, syncWhen, renderWhen, confirmDeleteForm, deleteFormConfirmed, openAddParam } from './screens/formEditor.js';
-import { renderEquipe, inviteSheet, confirmInvite, editMemberSheet, renderEditSheet, toggleFormAccess, saveMember, confirmResetPassword, resetMemberPassword, confirmDelete, deleteMember } from './screens/equipe.js';
+import { renderEquipe, inviteSheet, confirmInvite, editMemberSheet, renderEditSheet, toggleFormAccess, saveMember, confirmResetPassword, resetMemberPassword, confirmDelete, deleteMember, turnosSheet, saveTurnos } from './screens/equipe.js';
 import { profileMenu, changePasswordSheet, saveNewPassword, unidadeSheet, saveUnidade } from './screens/perfil.js';
 import { toast } from './helpers.js';
 
@@ -93,6 +93,8 @@ export function initEventDelegation() {
       case 'save-pass': saveNewPassword(); break;
       case 'unidade': closeModal(); unidadeSheet(); break;
       case 'save-unidade': saveUnidade(); break;
+      case 'edit-turnos': turnosSheet(); break;
+      case 'save-turnos': saveTurnos(); break;
       case 'open-form': navigate('op_fill', el.dataset.slot ? { form: el.dataset.form, slot: el.dataset.slot } : { form: el.dataset.form }); break;
       case 'submit-fill': submitFill(); break;
       case 'mock-photo': { const t = $('photo-tag'); if (t) { t.classList.remove('hidden'); t.classList.add('flex'); } toast('Foto anexada ao registro.'); break; }

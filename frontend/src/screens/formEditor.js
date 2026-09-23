@@ -111,7 +111,7 @@ export function renderWhen() {
       ${multi ? `<label class="mono text-[10px] uppercase text-on-surface-variant block mt-3">Em quais turnos</label><div class="flex gap-2 mt-1">${act.map(chip).join('')}</div>` : ''}
       ${toleranceBlock(w)}
       <p id="ed-slot-preview" class="text-[11px] text-on-surface-variant mt-2"></p>
-      <p class="text-[11px] text-on-surface-variant mt-1">Os horários dos turnos ficam em Dados da unidade.</p>`;
+      <p class="text-[11px] text-on-surface-variant mt-1">Os horários dos turnos ficam na tela Equipe.</p>`;
   } else {
     body = `<div class="flex items-start gap-2 bg-surface-container-low rounded-lg p-3 text-[12px] text-on-surface-variant">${icon('bolt', 'text-[18px] flex-none')}<span>Sem horário específico — preenchida quando houver demanda.</span></div>`;
   }

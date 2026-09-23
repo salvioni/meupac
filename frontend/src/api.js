@@ -124,3 +124,7 @@ export async function saveUnidade(payload) {
   const data = await request('/unidade', { method: 'PUT', body: payload });
   return data.unidade;
 }
+export async function saveTurnos(turnos) {
+  const data = await request('/unidade/turnos', { method: 'PUT', body: { turnos } });
+  return data.unidade;
+}

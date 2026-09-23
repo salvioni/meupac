@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
-import { authenticate, requireTitular } from '../middleware.js';
+import { authenticate, requireTitular, requireRole } from '../middleware.js';
 import { unidadeOut } from '../serialize.js';
 import { toMin } from '../../../frontend/src/schedule.js';
 
@@ -21,13 +21,17 @@ export const unidadeRouter = Router();
 unidadeRouter.put('/', authenticate, requireTitular, (req, res) => {
   const { razaoSocial, marca, cnpj, sif, endereco, municipio, rtNome, rtRegistro, logo } = req.body || {};
   if (logo && logo.length > 2_200_000) return res.status(413).json({ error: 'Logo muito grande (máx ~1,5MB).' });
-  const { turnos } = req.body || {};
-  if (turnos !== undefined) {
-    const err = validTurnos(turnos); if (err) return res.status(400).json({ error: err });
-    const clean = turnos.map(t => ({ inicio: String(t.inicio), fim: String(t.fim), ativo: t.ativo !== false }));
-    db.prepare('UPDATE unidade SET turnos_json = ? WHERE id = ?').run(JSON.stringify(clean), req.user.unidade_id);
-  }
   db.prepare(`UPDATE unidade SET razao_social=?, marca=?, cnpj=?, sif=?, endereco=?, municipio=?, rt_nome=?, rt_registro=?, logo=? WHERE id=?`)
     .run(razaoSocial || '', marca || '', cnpj || '', sif || '', endereco || '', municipio || '', rtNome || '', rtRegistro || '', logo || null, req.user.unidade_id);
+  res.json({ unidade: unidadeOut(db.prepare('SELECT * FROM unidade WHERE id=?').get(req.user.unidade_id)) });
+});
+
+// turnos do expediente: editados na tela Equipe por qualquer gestor (é quem monta a
+// escala), separado dos dados cadastrais, que só o titular altera.
+unidadeRouter.put('/turnos', authenticate, requireRole('gerente'), (req, res) => {
+  const { turnos } = req.body || {};
+  const err = validTurnos(turnos); if (err) return res.status(400).json({ error: err });
+  const clean = turnos.map(t => ({ inicio: String(t.inicio), fim: String(t.fim), ativo: t.ativo !== false }));
+  db.prepare('UPDATE unidade SET turnos_json = ? WHERE id = ?').run(JSON.stringify(clean), req.user.unidade_id);
   res.json({ unidade: unidadeOut(db.prepare('SELECT * FROM unidade WHERE id=?').get(req.user.unidade_id)) });
 });
