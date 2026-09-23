@@ -28,7 +28,7 @@ export function renderPainel() {
     const f = getForm(s.formId), pac = getPac(f.pacId);
     return pcard({
       icon: pac.icon, occ: true, title: f.title,
-      meta: `${icon('check_circle', 'text-[14px] text-outline flex-none')}<span class="truncate">${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`,
+      meta: `<span class="truncate">${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`,
       extra: `<div class="text-[11px] text-nc-tx font-semibold truncate mt-0.5">${esc(s.occurrence.issues[0])}</div>`,
       trailing: icon('chevron_right', 'text-on-surface-variant flex-none'),
       open: `data-action="open-sub" data-sub="${s.id}"`,
@@ -39,7 +39,7 @@ export function renderPainel() {
     const f = getForm(s.formId);
     return pcard({
       icon: getPac(f.pacId).icon, occ: s.occurrence, title: f.title,
-      meta: `${icon('check_circle', 'text-[14px] text-outline flex-none')}<span class="truncate">${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`,
+      meta: `<span class="truncate">${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`,
       trailing: `<button data-action="sign" data-sub="${s.id}" class="tap flex items-center gap-1.5 bg-primary text-on-primary text-[12px] font-semibold px-3 py-2 rounded-lg flex-none">${icon('draw', 'text-[16px]')} Assinar</button>`,
       open: `data-action="open-sub" data-sub="${s.id}"`,
     });

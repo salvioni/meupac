@@ -30,7 +30,7 @@ export function renderOpPac() {
         : `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">No Prazo</span>`);
     return pcard({
       icon: pac.icon, occ: st === 'ocorrencia', title: f.title,
-      meta: `${sub ? icon('check_circle', 'text-[14px] text-outline flex-none') : icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(t)}</span>`,
+      meta: `${sub ? '' : icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(t)}</span>`,
       trailing,
       open: sub ? `data-action="open-sub" data-sub="${sub.id}"` : `data-action="open-form" data-form="${f.id}"`,
     });
@@ -307,7 +307,7 @@ export function renderDetalhe() {
         <span class="mono text-[10px] text-on-surface-variant">${plCode(f)}</span>
       </div>
       <h1 class="text-[24px] font-bold text-on-surface leading-tight">${esc(f.title)}</h1>
-      <div class="flex items-center gap-1.5 mt-1 text-[12px] text-on-surface-variant">${icon('check_circle', 'text-[15px] text-outline')} Enviado em ${fmtDT(sub.ts)} · <span class="text-secondary font-semibold">${sub.signedBy ? 'Assinado' : 'Concluído'}</span></div>
+      <div class="flex items-center gap-1.5 mt-1 text-[12px] text-on-surface-variant">Enviado em ${fmtDT(sub.ts)} · <span class="text-secondary font-semibold">${sub.signedBy ? 'Assinado' : 'Concluído'}</span></div>
     </div>
     <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-4">
       <div class="flex items-center justify-between mb-1"><div class="flex items-center gap-1.5">${icon('location_on', 'text-secondary text-[18px]', true)}<span class="mono text-[10px] uppercase tracking-wide text-on-surface-variant">Local de Coleta</span></div><span class="mono text-[11px] text-on-surface-variant">${esc(f.sector)}</span></div>

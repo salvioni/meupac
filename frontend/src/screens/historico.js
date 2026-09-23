@@ -67,8 +67,8 @@ function histBody(subs, title, sub, showOperators) {
 function histCard(s, showAssinar) {
   const f = getForm(s.formId); const pac = getPac(f.pacId);
   const meta = showAssinar
-    ? `${icon('check_circle', 'text-[14px] text-outline flex-none')}<span class="truncate">${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`
-    : `${icon('check_circle', 'text-[14px] text-outline flex-none')}<span class="truncate">Enviado às ${fmtTime(s.ts)}</span>`;
+    ? `<span class="truncate">${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`
+    : `<span class="truncate">Enviado às ${fmtTime(s.ts)}</span>`;
   const extra = s.occurrence ? `<div class="text-[11px] text-nc-tx font-medium truncate mt-0.5">Não conforme: ${esc(s.occurrence.issues[0])}</div>` : '';
   let trailing;
   if (showAssinar) {
