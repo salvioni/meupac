@@ -51,6 +51,13 @@ export function renderFormEditor() {
       </button>
       <div class="px-4 pb-4 space-y-3" data-section-body="freq">
         <div id="ed-when-wrap"></div>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Quem preenche</label>
+          <div class="grid grid-cols-2 gap-2 mt-1">
+            <button data-fill-mode="um" class="fill-mode-btn tap rounded-lg px-3 py-2 text-left"><div class="text-[13px] font-semibold">Basta um</div><div class="text-[11px] opacity-80">O primeiro envio conclui</div></button>
+            <button data-fill-mode="cada" class="fill-mode-btn tap rounded-lg px-3 py-2 text-left"><div class="text-[13px] font-semibold">Cada pessoa</div><div class="text-[11px] opacity-80">Todos com acesso enviam</div></button>
+          </div>
+          <p id="ed-fill-help" class="text-[11px] text-on-surface-variant mt-1"></p>
+        </div>
         <div><label class="mono text-[10px] uppercase text-on-surface-variant">Local / Ponto de Coleta</label><input id="ed-loc" value="${editing ? esc(editing.location) : ''}" placeholder="Ex: Reservatório Central" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
       </div>
     </section>
@@ -71,6 +78,17 @@ export function renderFormEditor() {
   </div>`;
   app().innerHTML = shell(inner, GE_NAV, 'ge_forms', profileTrigger());
   renderEditorParams();
+  // quem preenche: registro do processo/local (basta um; mais gente = cobertura) ou
+  // registro sobre a própria pessoa (cada um envia o seu)
+  window.__fillMode = editing && editing.fillMode === 'cada' ? 'cada' : 'um';
+  const paintFill = () => {
+    document.querySelectorAll('.fill-mode-btn').forEach(b => b.className = 'fill-mode-btn tap rounded-lg px-3 py-2 text-left ' + (b.dataset.fillMode === window.__fillMode ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'));
+    $('ed-fill-help').textContent = window.__fillMode === 'cada'
+      ? 'Para registros sobre a própria pessoa (ex.: autodeclaração de saúde, uniforme). O horário só se completa quando todos os operadores com acesso, do turno, enviarem.'
+      : 'Para registros do processo ou do local (ex.: cloro, temperatura). Quem mais tiver acesso serve de cobertura.';
+  };
+  document.querySelectorAll('.fill-mode-btn').forEach(b => b.onclick = () => { window.__fillMode = b.dataset.fillMode; paintFill(); });
+  paintFill();
   renderWhen();
   document.querySelectorAll('[data-toggle-section]').forEach(btn => {
     btn.onclick = () => {
@@ -470,7 +488,7 @@ export async function saveFormEditor() {
   const loc = $('ed-loc').value.trim() || 'A definir';
   const pac = editing ? getPac(editing.pacId) : getPac(params.pac || DB.pacs[0].id);
   const toleranceMin = ((w.type === 'fixos' && !w.noTime) || w.type === 'momentos' || usesWindow(schedule)) ? (w.toleranceMin || 0) : 0;
-  const payload = { pacId: pac.id, title, due, schedule, days, times, location: loc, params: window.__editorParams, toleranceMin };
+  const payload = { pacId: pac.id, title, due, schedule, days, times, location: loc, params: window.__editorParams, toleranceMin, fillMode: window.__fillMode };
 
   const btn = document.querySelector('[data-action="save-form"]');
   if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }

@@ -38,10 +38,21 @@ submissionsRouter.post('/', authenticate, requireRole('operador'), (req, res) =>
   if (slots.length) {
     slot = String(req.body.slot || '');
     if (!slots.includes(slot)) return res.status(400).json({ error: 'Horário inválido para esta planilha.' });
+  }
+
+  // um registro por evento: "basta um" = um por horário (ou por dia, se não há horário);
+  // "cada pessoa" = um por pessoa nesse horário. "Sob demanda" pode ocorrer várias vezes.
+  const schedule = JSON.parse(form.schedule_json || 'null');
+  if (!(schedule && schedule.type === 'demanda')) {
+    const cada = form.fill_mode === 'cada';
     const today = new Date().toDateString();
-    const taken = db.prepare('SELECT ts FROM submissions WHERE form_id = ? AND slot = ?').all(form.id, slot)
-      .some(r => new Date(r.ts).toDateString() === today);
-    if (taken) return res.status(409).json({ error: `O horário ${slot} desta planilha já foi registrado hoje.` });
+    const dup = db.prepare('SELECT operator_id, operator_name, ts, slot FROM submissions WHERE form_id = ?').all(form.id)
+      .find(r => new Date(r.ts).toDateString() === today && (!slot || r.slot === slot) && (!cada || r.operator_id === req.user.id));
+    if (dup) {
+      const quem = dup.operator_id === req.user.id ? 'Você já registrou' : `${dup.operator_name} já registrou`;
+      const hora = new Date(dup.ts).toTimeString().slice(0, 5);
+      return res.status(409).json({ error: `${quem} ${slot ? `o horário ${slot}` : 'esta planilha hoje'} às ${hora}.` });
+    }
   }
 
   const outValues = {};

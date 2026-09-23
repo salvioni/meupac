@@ -20,9 +20,6 @@ export function pacOf(formId) { const f = getForm(formId); return f ? getPac(f.p
 export function subsFor(formId) { return DB.submissions.filter(s => s.formId === formId); }
 export function todaySubFor(formId) { return subsFor(formId).find(s => isToday(s.ts)); }
 
-// prazo real (em minutos desde 00:00) da planilha hoje — usa o(s) horário(s) fixos
-// definidos (ou o "due" legado); o app só rastreia 1 envio/dia, então o prazo é o
-// ÚLTIMO horário do dia. Sem horário definido (sob demanda, N vezes, etc.), retorna null.
 // ---- horários do dia ----------------------------------------------------------
 // Uma planilha pode ter vários horários por dia (fixos, "a cada 2 horas", "3x ao dia"),
 // e cada horário precisa do seu envio. Sem horários (momentos, sob demanda...), vale
@@ -33,13 +30,52 @@ export function formSlots(f) { return daySlots(f.schedule, f.times, f.due, unitT
 // hoje é um dos dias marcados no editor?
 export function activeToday(f) { return activeOn(f.schedule, f.days); }
 
+// ---- quem preenche -----------------------------------------------------------------
+// "um" (padrão): o primeiro envio conclui o horário — registros sobre o processo/local
+// (cloro, câmara…), e ter mais gente com acesso é cobertura. "cada": cada pessoa envia o
+// seu — registros sobre a própria pessoa (autodeclaração de saúde, uniforme, ciência de POP).
+export const isCada = f => f.fillMode === 'cada';
+
+// quem precisa enviar numa planilha "cada pessoa" (só o gestor tem DB.team): operadores
+// com acesso — ou todos, se a planilha não tem ninguém designado — do turno do horário.
+export function requiredPeople(f, turnos = []) {
+  const ops = (DB.team || []).filter(t => t.role === 'operador' && t.active !== false);
+  const withAccess = f.operatorIds && f.operatorIds.length ? ops.filter(t => f.operatorIds.includes(t.id)) : ops;
+  return withAccess.filter(t => slotVisibleTo(t)({ turnos }));
+}
+function cadaProgress(f, subs, turnos) {
+  const req = requiredPeople(f, turnos);
+  const done = new Set(subs.map(s => s.operatorId));
+  const faltam = req.filter(t => !done.has(t.id));
+  return { feitos: req.length ? req.length - faltam.length : subs.length, total: req.length, faltam, complete: req.length ? !faltam.length : subs.length > 0 };
+}
+
+// envios de hoje que contam pra "who": numa planilha "cada pessoa", só os dele
+function todaySubs(f, who) {
+  return subsFor(f.id).filter(s => isToday(s.ts) && (!who || !isCada(f) || s.operatorId === who.id))
+    .sort((a, b) => new Date(a.ts) - new Date(b.ts));
+}
+// o envio de hoje de uma planilha sem horários (visto por "who")
+export function daySub(f, who = null) { return todaySubs(f, who)[0] || null; }
+
 // cada horário de hoje com o envio que o cumpre. Envios antigos (sem slot gravado)
 // ficam com o horário livre mais próximo antes deles. Um envio cujo horário deixou de
 // existir (ex.: turno desligado) não é reaproveitado para outro horário.
-export function slotStates(f) {
+// who: a pessoa do ponto de vista (operador); sem who = visão do gestor, em que um
+// horário "cada pessoa" só está feito quando todos os responsáveis enviaram.
+export function slotStates(f, who = null) {
   const slots = formSlots(f); if (!slots.length) return [];
   const info = Object.fromEntries(slotInfo(f.schedule, f.times, f.due, unitTurnos()).map(x => [x.time, x]));
-  const subs = subsFor(f.id).filter(s => isToday(s.ts)).sort((a, b) => new Date(a.ts) - new Date(b.ts));
+  const subs = todaySubs(f, who);
+  const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
+  const late = slot => nowMin > toMin(slot) + (f.toleranceMin || 0);
+  if (isCada(f) && !who) {
+    return slots.map(slot => {
+      const ss = subs.filter(s => s.slot === slot), prog = cadaProgress(f, ss, info[slot].turnos);
+      const status = prog.complete ? (ss.some(s => s.occurrence) ? 'ocorrencia' : 'concluido') : late(slot) ? 'atrasado' : 'afazer';
+      return { slot, sub: prog.complete ? ss[ss.length - 1] : null, subs: ss, ...prog, status, label: info[slot].label || null, turnos: info[slot].turnos };
+    });
+  }
   const bySlot = new Map();
   subs.forEach(s => { if (s.slot && slots.includes(s.slot) && !bySlot.has(s.slot)) bySlot.set(s.slot, s); });
   subs.filter(s => !s.slot).forEach(s => {
@@ -48,19 +84,18 @@ export function slotStates(f) {
     const pick = free.slice().reverse().find(x => toMin(x) <= m) || free[0];
     if (pick) bySlot.set(pick, s);
   });
-  const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
   return slots.map(slot => {
     const sub = bySlot.get(slot) || null;
-    const status = sub ? (sub.occurrence ? 'ocorrencia' : 'concluido') : nowMin > toMin(slot) + (f.toleranceMin || 0) ? 'atrasado' : 'afazer';
+    const status = sub ? (sub.occurrence ? 'ocorrencia' : 'concluido') : late(slot) ? 'atrasado' : 'afazer';
     return { slot, sub, status, label: info[slot].label || null, turnos: info[slot].turnos };
   });
 }
 
 // o que o operador precisa fazer agora: os horários atrasados + o próximo a vencer.
 // keep filtra os horários (ex.: só os do turno da pessoa) antes de escolher o próximo.
-export function openSlots(f, keep = () => true) {
+export function openSlots(f, keep = () => true, who = null) {
   if (!activeToday(f)) return [];
-  const pending = slotStates(f).filter(x => !x.sub && keep(x));
+  const pending = slotStates(f, who).filter(x => !x.sub && keep(x));
   const late = pending.filter(x => x.status === 'atrasado');
   const next = pending.find(x => x.status !== 'atrasado');
   return next ? [...late, next] : late;
@@ -89,10 +124,17 @@ export function formStatus(f) {
     if (states.every(x => x.sub)) return states.some(x => x.sub.occurrence) ? 'ocorrencia' : 'concluido';
     return 'afazer';
   }
+  if (isCada(f)) {
+    const subs = todaySubs(f), prog = cadaProgress(f, subs, []);
+    return prog.complete ? (subs.some(s => s.occurrence) ? 'ocorrencia' : 'concluido') : 'afazer';
+  }
   const sub = todaySubFor(f.id);
   if (sub) return sub.occurrence ? 'ocorrencia' : 'concluido';
   return 'afazer'; // sem horário não há como estar atrasada
 }
+
+// progresso de hoje de uma planilha "cada pessoa" sem horários (painel do gestor)
+export function dayProgress(f) { return cadaProgress(f, todaySubs(f), []); }
 
 export function daysLabel(days) {
   if (!days || !days.length || days.length === 7) return 'todos os dias';

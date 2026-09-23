@@ -17,7 +17,7 @@ export function formOut(f) {
     days: f.days_json ? JSON.parse(f.days_json) : [],
     times: f.times_json ? JSON.parse(f.times_json) : [],
     location: f.location, sector: f.sector, defaultStatus: f.default_status,
-    toleranceMin: f.tolerance_min || 0, active: !!f.active,
+    toleranceMin: f.tolerance_min || 0, active: !!f.active, fillMode: f.fill_mode === 'cada' ? 'cada' : 'um',
     params: JSON.parse(f.params_json), operatorIds: formOperatorIds(f.id),
   };
 }

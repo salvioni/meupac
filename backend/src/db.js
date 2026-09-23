@@ -126,6 +126,8 @@ ensureColumn('forms', 'tolerance_min', 'tolerance_min INTEGER NOT NULL DEFAULT 0
 ensureColumn('forms', 'active', 'active INTEGER NOT NULL DEFAULT 1');
 // horário do dia ("HH:MM") que o envio cumpre, pra planilhas com vários horários
 ensureColumn('submissions', 'slot', 'slot TEXT');
+// quem preenche: 'um' = basta um registro por horário; 'cada' = cada pessoa com acesso envia o seu
+ensureColumn('forms', 'fill_mode', "fill_mode TEXT NOT NULL DEFAULT 'um'");
 // turnos do expediente da unidade: [{ inicio, fim, ativo }] (null = padrão de schedule.js)
 ensureColumn('unidade', 'turnos_json', 'turnos_json TEXT');
 // turno de cada pessoa: 0 = 1º, 1 = 2º, NULL = ambos. Na criação da coluna, aproveita

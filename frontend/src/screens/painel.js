@@ -1,5 +1,5 @@
 import { $, esc, icon, fmtTime, isToday, toast } from '../helpers.js';
-import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, ownerName, dueText, slotStates, openSlots } from '../state.js';
+import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, ownerName, dueText, slotStates, openSlots, isCada, formSlots, dayProgress } from '../state.js';
 import { shell, profileTrigger, pcard, secHead } from '../ui.js';
 import { GE_NAV, STATUS_META } from '../config.js';
 import * as api from '../api.js';
@@ -22,11 +22,24 @@ function computeStats() {
 // (ex.: "10:00 · 2 de 7 hoje"); sem horários, a descrição da frequência.
 function whenLabel(f) {
   const states = slotStates(f);
+  // "cada pessoa": o progresso que importa é o de pessoas (whoLabel), não o de horários
+  if (isCada(f) && states.length) { const open = openSlots(f); return open.length ? (open[0].label || open[0].slot) : dueText(f).split(' · ')[0]; }
   if (states.length > 1) {
     const open = openSlots(f), feitos = states.filter(x => x.sub).length;
     return `${open.length ? (open[0].label || open[0].slot) + ' · ' : ''}${feitos} de ${states.length} hoje`;
   }
   return dueText(f).split(' · ')[0];
+}
+
+// quem: em "basta um", os responsáveis; em "cada pessoa", o progresso do horário em
+// aberto (ou do dia) e quem ainda falta — é isso que o gestor precisa cobrar.
+function whoLabel(f) {
+  if (!isCada(f)) return ownerName(f);
+  const open = openSlots(f);
+  const prog = formSlots(f).length ? open[0] : dayProgress(f);
+  if (!prog || !prog.total) return ownerName(f);
+  const nomes = prog.faltam.map(t => t.name.split(' ')[0]);
+  return `${prog.feitos} de ${prog.total} enviaram${nomes.length ? ` · falta: ${nomes.join(', ')}` : ''}`;
 }
 
 export function renderPainel() {
@@ -60,7 +73,7 @@ export function renderPainel() {
     const st = formStatus(f);
     return pcard({
       icon: getPac(f.pacId).icon, occ: false, title: f.title,
-      meta: `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(whenLabel(f))} · ${esc(ownerName(f))}</span>`,
+      meta: `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(whenLabel(f))} · ${esc(whoLabel(f))}</span>`,
       trailing: st === 'atrasado'
         ? `<span class="mono text-[10px] font-bold uppercase px-2 py-1 rounded ${STATUS_META.atrasado.bg} ${STATUS_META.atrasado.tx} flex-none">${STATUS_META.atrasado.label}</span>`
         : `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">No Prazo</span>`,

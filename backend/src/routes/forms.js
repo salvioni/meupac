@@ -22,7 +22,7 @@ function validatePayload(body) {
 formsRouter.post('/', authenticate, requireRole('gerente'), (req, res) => {
   const err = validatePayload(req.body);
   if (err) return res.status(400).json({ error: err });
-  const { pacId, title, location, schedule, days, times, due, params, sector, toleranceMin } = req.body;
+  const { pacId, title, location, schedule, days, times, due, params, sector, toleranceMin, fillMode } = req.body;
   const pac = db.prepare('SELECT * FROM pacs WHERE id = ? AND unidade_id = ?').get(pacId, req.user.unidade_id);
   if (!pac) return res.status(404).json({ error: 'PAC não encontrado.' });
 
@@ -31,10 +31,10 @@ formsRouter.post('/', authenticate, requireRole('gerente'), (req, res) => {
   const revDate = new Date().toISOString();
   const paramsWithIds = params.map(p => ({ ...p, id: p.id || 'p' + Date.now() + Math.random().toString(36).slice(2, 6) }));
 
-  db.prepare(`INSERT INTO forms (id,unidade_id,pac_id,pl_num,rev,rev_date,title,due,schedule_json,days_json,times_json,location,sector,default_status,params_json,operator_id,tolerance_min)
-    VALUES (?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,NULL,?)`)
+  db.prepare(`INSERT INTO forms (id,unidade_id,pac_id,pl_num,rev,rev_date,title,due,schedule_json,days_json,times_json,location,sector,default_status,params_json,operator_id,tolerance_min,fill_mode)
+    VALUES (?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,NULL,?,?)`)
     .run(id, req.user.unidade_id, pacId, plNum, revDate, title.trim(), due || '', JSON.stringify(schedule || null), JSON.stringify(days || []), JSON.stringify(times || []),
-      (location || 'A definir').trim(), sector || 'Definido', 'afazer', JSON.stringify(paramsWithIds), Math.max(0, parseInt(toleranceMin, 10) || 0));
+      (location || 'A definir').trim(), sector || 'Definido', 'afazer', JSON.stringify(paramsWithIds), Math.max(0, parseInt(toleranceMin, 10) || 0), fillMode === 'cada' ? 'cada' : 'um');
 
   res.status(201).json({ form: formOut(db.prepare('SELECT * FROM forms WHERE id = ?').get(id)) });
 });
@@ -46,17 +46,17 @@ formsRouter.put('/:id', authenticate, requireRole('gerente'), (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Planilha não encontrada.' });
   const err = validatePayload(req.body);
   if (err) return res.status(400).json({ error: err });
-  const { title, location, schedule, days, times, due, params, sector, toleranceMin } = req.body;
+  const { title, location, schedule, days, times, due, params, sector, toleranceMin, fillMode } = req.body;
 
   db.prepare('INSERT INTO form_revisions (form_id, rev, snapshot_json, archived_at) VALUES (?,?,?,?)')
     .run(existing.id, existing.rev, JSON.stringify(existing), new Date().toISOString());
 
   const paramsWithIds = params.map(p => ({ ...p, id: p.id || 'p' + Date.now() + Math.random().toString(36).slice(2, 6) }));
   const newRev = (existing.rev || 1) + 1;
-  db.prepare(`UPDATE forms SET title=?, due=?, schedule_json=?, days_json=?, times_json=?, location=?, sector=?, params_json=?, rev=?, rev_date=?, tolerance_min=? WHERE id=?`)
+  db.prepare(`UPDATE forms SET title=?, due=?, schedule_json=?, days_json=?, times_json=?, location=?, sector=?, params_json=?, rev=?, rev_date=?, tolerance_min=?, fill_mode=? WHERE id=?`)
     .run(title.trim(), due || '', JSON.stringify(schedule || null), JSON.stringify(days || []), JSON.stringify(times || []),
       (location || existing.location).trim(), sector || existing.sector, JSON.stringify(paramsWithIds), newRev, new Date().toISOString(),
-      Math.max(0, parseInt(toleranceMin, 10) || 0), existing.id);
+      Math.max(0, parseInt(toleranceMin, 10) || 0), fillMode === 'cada' ? 'cada' : 'um', existing.id);
 
   res.json({ form: formOut(db.prepare('SELECT * FROM forms WHERE id = ?').get(existing.id)) });
 });
