@@ -102,7 +102,7 @@ export function renderFormEditor() {
 export function renderWhen() {
   const wrap = $('ed-when-wrap'); if (!wrap) return;
   const w = window.__when;
-  const typeBtn = (v, label, ic) => `<button data-action="when-type" data-type="${v}" class="tap flex items-center justify-center gap-1 py-2 rounded-lg text-[12px] font-semibold ${w.type === v ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${icon(ic, 'text-[16px]')} ${label}</button>`;
+  const typeBtn = (v, label, ic) => `<button data-action="when-type" data-type="${v}" class="tap flex items-center justify-center gap-1 py-2 md:px-3 rounded-lg text-[12px] font-semibold ${w.type === v ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${icon(ic, 'text-[16px]')} ${label}</button>`;
   let body = '';
   if (w.type === 'fixos') {
     // "sem horário específico": 1 registro por dia, a qualquer hora, sem prazo/atraso
@@ -142,7 +142,7 @@ export function renderWhen() {
       ${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => `<button data-when-day="${i}" class="wday-btn tap w-8 h-8 rounded-lg font-semibold text-[13px]">${d}</button>`).join('')}
     </div></div>`;
   wrap.innerHTML = `<label class="mono text-[10px] uppercase text-on-surface-variant">Quando preencher</label>
-    <div class="grid grid-cols-3 gap-2 mt-1">${typeBtn('fixos', 'Fixos', 'schedule')}${typeBtn('intervalo', 'A cada', 'timelapse')}${typeBtn('vezes', 'Vezes', 'repeat')}${typeBtn('momentos', 'Momentos', 'flag')}${typeBtn('demanda', 'Demanda', 'bolt')}</div>
+    <div class="grid grid-cols-3 gap-2 mt-1 md:flex md:flex-wrap">${typeBtn('fixos', 'Fixos', 'schedule')}${typeBtn('intervalo', 'A cada', 'timelapse')}${typeBtn('vezes', 'Vezes', 'repeat')}${typeBtn('momentos', 'Momentos', 'flag')}${typeBtn('demanda', 'Demanda', 'bolt')}</div>
     <div class="mt-3">${body}</div>${daysBlock}`;
   if (w.type === 'fixos' && !w.noTime) renderEditorTimes();
   const nt = $('ed-notime'); if (nt) nt.onclick = () => { syncWhen(); w.noTime = !w.noTime; renderWhen(); };
@@ -236,7 +236,7 @@ function timeSelect(kind, val, i) {
 export function renderEditorTimes() {
   const wrap = $('ed-times'); if (!wrap) return;
   // "adicionar" é uma caixinha do mesmo formato dos horários, logo depois do último
-  const addChip = `<button data-action="add-time" class="tap inline-flex items-center gap-1 bg-surface-container-low rounded-lg px-3 py-1.5 border border-dashed border-outline-variant text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} ${window.__editorTimes.length ? 'Horário' : 'Adicionar horário'}</button>`;
+  const addChip = `<button data-action="add-time" class="tap inline-flex items-center gap-1 bg-surface-container-low rounded-lg px-3 py-1.5 border border-dashed border-outline-variant text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} Adicionar horário</button>`;
   wrap.innerHTML = window.__editorTimes.map((t, i) => {
     const parts = (t || '').split(':'); const hv = parts[0] !== undefined && parts[0] !== '' ? parseInt(parts[0], 10) : ''; const mv = parts[1] !== undefined && parts[1] !== '' ? parseInt(parts[1], 10) : '';
     return `<span class="inline-flex items-center gap-0.5 bg-surface-container-low rounded-lg pl-2 pr-1 py-1.5 border border-transparent focus-within:border-primary">
