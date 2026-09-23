@@ -1,5 +1,5 @@
 import { $, esc, icon, toast } from '../helpers.js';
-import { params, getForm, getPac, DB, nextPlNum, revLabel, unitTurnos } from '../state.js';
+import { params, getForm, getPac, DB, nextPlNum, unitTurnos } from '../state.js';
 import { shell, profileTrigger } from '../ui.js';
 import { GE_NAV } from '../config.js';
 import * as api from '../api.js';
@@ -40,7 +40,6 @@ export function renderFormEditor() {
           <div><div class="mono text-[10px] uppercase text-on-surface-variant">Código da Planilha</div><div class="mono text-[13px] font-bold text-on-surface">PL ${String(editing ? editing.plNum : nextPlNum(pac.id)).padStart(2, '0')}</div></div>
           <div class="text-right"><div class="mono text-[10px] uppercase text-on-surface-variant">${editing ? 'Ao publicar' : 'Revisão'}</div><div class="mono text-[13px] font-bold ${editing ? 'text-tertiary' : 'text-secondary'}">${editing ? 'Rev. ' + String((editing.rev || 1) + 1).padStart(2, '0') : 'Rev. 01'}</div></div>
         </div>
-        ${editing ? `<div class="flex items-center gap-1.5 text-[11px] text-on-surface-variant">${icon('history', 'text-[15px]')} Vigente: ${revLabel(editing)} · a versão anterior fica arquivada na auditoria.</div>` : ''}
       </div>
     </section>
 
@@ -134,7 +133,7 @@ export function renderWhen() {
       ${toleranceBlock(w)}
       <p id="ed-slot-preview" class="text-[11px] text-on-surface-variant mt-2"></p>`;
   } else {
-    body = `<div class="flex items-start gap-2 bg-surface-container-low rounded-lg p-3 text-[12px] text-on-surface-variant">${icon('bolt', 'text-[18px] flex-none')}<span>Sem horário específico — preenchida quando houver demanda.</span></div>`;
+    body = `<div class="flex items-start gap-2 bg-surface-container-low rounded-lg p-3 text-[12px] text-on-surface-variant">${icon('bolt', 'text-[18px] flex-none')}<span>Sem horário nem dia específico.</span></div>`;
   }
   const daysBlock = w.type === 'demanda' ? '' : `<div class="mt-4"><label class="mono text-[10px] uppercase text-on-surface-variant">Dias</label>
     <div class="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -323,34 +322,29 @@ function paramTypeBody(p) {
       <div class="grid grid-cols-2 gap-2">
         <div><label class="mono text-[10px] uppercase text-on-surface-variant">Incremento (+/-)</label><input data-pstep type="number" step="0.1" min="0.01" placeholder="1" value="${p.step || 1}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
         <div><label class="mono text-[10px] uppercase text-on-surface-variant">Unidade (opcional)</label><input data-punit placeholder="unid." value="${esc(p.unit)}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
-      </div>
-      <p class="text-[11px] text-on-surface-variant">Registra o número que o operador digitar — sem faixa mínima/máxima nem avaliação de conformidade.</p>`;
+      </div>`;
 
   if (p.type === 'texto') return `
       <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-lg p-3">
         <div class="mono text-[10px] text-on-surface-variant">Resposta do operador</div>
         <div class="h-8 border-b border-dashed border-outline-variant mt-1"></div>
-      </div>
-      <p class="text-[11px] text-on-surface-variant">O operador escreve uma resposta curta — não conta como não conformidade.</p>`;
+      </div>`;
 
   if (p.type === 'simnao') return `
       <div class="grid grid-cols-2 gap-2">
         <div class="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-surface-container text-on-surface font-semibold text-[13px]">${icon('check', 'text-[16px]')} Sim</div>
         <div class="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-surface-container text-on-surface font-semibold text-[13px]">${icon('close', 'text-[16px]')} Não</div>
-      </div>
-      <p class="text-[11px] text-on-surface-variant">Pergunta neutra — qualquer resposta conta como preenchida, sem gerar não conformidade.</p>`;
+      </div>`;
 
   if (p.type === 'data') return `
       <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-lg p-3 flex items-center gap-2">
         ${icon('calendar_today', 'text-on-surface-variant text-[16px]')}<span class="mono text-[12px] text-on-surface-variant">dd/mm/aaaa</span>
-      </div>
-      <p class="text-[11px] text-on-surface-variant">Use pra data de um evento (ex: início de um reparo) — não pra "quando preencheu", isso já é registrado sozinho.</p>`;
+      </div>`;
 
   if (p.type === 'hora') return `
       <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-lg p-3 flex items-center gap-2">
         ${icon('schedule', 'text-on-surface-variant text-[16px]')}<span class="mono text-[12px] text-on-surface-variant">hh:mm</span>
-      </div>
-      <p class="text-[11px] text-on-surface-variant">Use pra horário de um evento (ex: término de um reparo) — não pra "quando preencheu", isso já é registrado sozinho.</p>`;
+      </div>`;
 
   if (p.type === 'escolha') {
     const options = p.options && p.options.length ? p.options : ['Opção 1', 'Opção 2'];
@@ -363,8 +357,7 @@ function paramTypeBody(p) {
           ${options.length > 2 ? `<button type="button" data-opt-del class="tap flex-none text-on-surface-variant">${icon('close', 'text-[18px]')}</button>` : ''}
         </div>`).join('')}
       </div>
-      <button type="button" data-opt-add class="tap inline-flex items-center gap-1 text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} Adicionar opção</button>
-      <p class="text-[11px] text-on-surface-variant">O operador escolhe uma das opções. Marque "Não conf." nas que devem contar como não conformidade (ex.: "NC" em C/NC/NA).</p>`;
+      <button type="button" data-opt-add class="tap inline-flex items-center gap-1 text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} Adicionar opção</button>`;
   }
 
   // qualitative (Conformidade)
@@ -374,7 +367,6 @@ function paramTypeBody(p) {
         <div class="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-conf-bg text-conf-tx font-semibold text-[13px]">${icon('check_circle', 'text-[16px]', true)}<span data-preview-good>${esc(p.good || 'Conforme')}</span></div>
         <div class="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-nc-bg text-nc-tx font-semibold text-[13px]">${icon('cancel', 'text-[16px]', true)} Não Conf.</div>
       </div>
-      <p class="text-[11px] text-on-surface-variant">É assim que o operador marca essa medição — sem digitar nada.</p>
       <button type="button" data-toggle-good class="${hasCustomGood ? 'hidden' : ''} text-[12px] font-semibold text-primary">Personalizar texto de "conforme"</button>
       <div data-good-custom class="${hasCustomGood ? '' : 'hidden'}">
         <label class="mono text-[10px] uppercase text-on-surface-variant">Texto quando conforme</label>
