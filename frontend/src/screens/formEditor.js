@@ -73,7 +73,6 @@ export function renderFormEditor() {
     </section>
 
     <button data-action="save-form" class="tap w-full bg-primary text-on-primary rounded-xl py-4 font-semibold flex items-center justify-center gap-2 text-[15px]">${editing ? 'Salvar e Publicar Rev. ' + String((editing.rev || 1) + 1).padStart(2, '0') : 'Criar Planilha'}</button>
-    <p class="text-center text-[11px] text-on-surface-variant">${editing ? 'Publicar cria uma nova revisão; a anterior é arquivada para auditoria.' : 'O código PL é gerado automaticamente e sequencial ao publicar.'}</p>
   </div>`;
   app().innerHTML = shell(inner, GE_NAV, 'ge_forms', profileTrigger());
   renderEditorParams();
