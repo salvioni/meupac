@@ -1,5 +1,5 @@
 import { isToday } from './helpers.js';
-import { daySlots, toMin, usesWindow, DEFAULT_START, DEFAULT_END } from './schedule.js';
+import { daySlots, toMin, usesWindow, activeOn, DEFAULT_START, DEFAULT_END } from './schedule.js';
 
 // Cache local do estado vindo do backend (substitui o antigo objeto persistido
 // em localStorage). É preenchido por api.refreshState() e só isso — nenhuma
@@ -28,6 +28,8 @@ export function todaySubFor(formId) { return subsFor(formId).find(s => isToday(s
 // e cada horário precisa do seu envio. Sem horários (momentos, sob demanda...), vale
 // 1 envio por dia, sem prazo. O cálculo mora em schedule.js (compartilhado com o backend).
 export function formSlots(f) { return daySlots(f.schedule, f.times, f.due); }
+// hoje é um dos dias marcados no editor?
+export function activeToday(f) { return activeOn(f.schedule, f.days); }
 
 // cada horário de hoje com o envio que o cumpre. Envios antigos (sem slot gravado)
 // ficam com o horário livre mais próximo antes deles.
@@ -52,6 +54,7 @@ export function slotStates(f) {
 
 // o que o operador precisa fazer agora: os horários atrasados + o próximo a vencer
 export function openSlots(f) {
+  if (!activeToday(f)) return [];
   const pending = slotStates(f).filter(x => !x.sub);
   const late = pending.filter(x => x.status === 'atrasado');
   const next = pending.find(x => x.status !== 'atrasado');
@@ -65,6 +68,8 @@ export function dueMinutesToday(f) {
 }
 
 export function formStatus(f) {
+  // fora dos dias marcados não há o que cobrar (a não ser que tenham preenchido mesmo assim)
+  if (!activeToday(f)) { const sub = todaySubFor(f.id); return sub ? (sub.occurrence ? 'ocorrencia' : 'concluido') : 'folga'; }
   const states = slotStates(f);
   if (states.length) {
     if (states.some(x => x.status === 'atrasado')) return 'atrasado';

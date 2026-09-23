@@ -56,3 +56,11 @@ export function daySlots(schedule, times, due) {
   }
   return [...new Set(out)].map(fromMin);
 }
+
+// dias da semana em que a planilha é preenchida (0 = domingo … 6 = sábado, igual a
+// Date.getDay()). Lista vazia = todos os dias; "sob demanda" não tem dia fixo.
+export function activeOn(schedule, days, date = new Date()) {
+  if (schedule && schedule.type === 'demanda') return true;
+  const list = (schedule && schedule.days && schedule.days.length) ? schedule.days : (days || []);
+  return !list.length || list.map(Number).includes(date.getDay());
+}

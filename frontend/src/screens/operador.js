@@ -1,5 +1,5 @@
 import { $, esc, icon, fmtTime, fmtDT, toast, hashFor } from '../helpers.js';
-import { DB, currentUser, params, getForm, getPac, visibleToOperator, pacActive, formActive, todaySubFor, dueText, plCode, formSlots, slotStates, openSlots } from '../state.js';
+import { DB, currentUser, params, getForm, getPac, visibleToOperator, pacActive, formActive, todaySubFor, dueText, plCode, formSlots, slotStates, openSlots, activeToday } from '../state.js';
 import { toMin, usesWindow } from '../schedule.js';
 import { shell, profileTrigger, pcard } from '../ui.js';
 import { OP_NAV, GE_NAV, STATUS_META } from '../config.js';
@@ -24,7 +24,7 @@ export function renderOpPac() {
       slotStates(f).filter(x => x.sub).forEach(x => done.push({ f, slot: x.slot, sub: x.sub }));
     } else {
       const sub = todaySubFor(f.id);
-      if (sub) done.push({ f, slot: null, sub }); else todo.push({ f, slot: null, st: 'afazer', min: Infinity });
+      if (sub) done.push({ f, slot: null, sub }); else if (activeToday(f)) todo.push({ f, slot: null, st: 'afazer', min: Infinity });
     }
   });
   todo.sort((a, b) => (a.st === 'atrasado' ? 0 : 1) - (b.st === 'atrasado' ? 0 : 1) || a.min - b.min);
