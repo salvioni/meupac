@@ -57,6 +57,7 @@ export function renderFormEditor() {
           </div>
         </div>
         <div class="mt-4 pt-4 border-t border-outline-variant/40">${lbl('Local / ponto de coleta')}<input id="ed-loc" value="${editing ? esc(editing.location) : ''}" placeholder="Ex: Reservatório Central" class="w-full bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
+        <div id="ed-tol-wrap"></div>
       </div>
     </section>
 
@@ -144,7 +145,8 @@ export function renderWhen() {
 
   wrap.innerHTML = lbl('Quando preencher')
     + `<div class="grid grid-cols-5 gap-1.5">${typeBtn('fixos', 'Fixos', 'schedule')}${typeBtn('intervalo', 'A cada', 'timelapse')}${typeBtn('vezes', 'Vezes', 'repeat')}${typeBtn('momentos', 'Momentos', 'flag')}${typeBtn('demanda', 'Demanda', 'bolt')}</div>
-    <div class="mt-3">${config}</div>${horarios}${tolerancia}${dias}`;
+    <div class="mt-3">${config}</div>${horarios}${dias}`;
+  const tw = $('ed-tol-wrap'); if (tw) tw.innerHTML = tolerancia; // fica embaixo do Local
 
   if (w.type === 'fixos' && !w.noTime) renderEditorTimes();
   const nt = $('ed-notime'); if (nt) nt.onclick = () => { syncWhen(); w.noTime = !w.noTime; renderWhen(); };
@@ -363,16 +365,10 @@ function paramTypeBody(p) {
   }
 
   // qualitative (Conformidade)
-  const hasCustomGood = !!p.good && p.good !== 'Conforme';
   return `
       <div class="grid grid-cols-2 gap-2">
         <div class="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-conf-bg text-conf-tx font-semibold text-[13px]">${icon('check_circle', 'text-[16px]', true)}<span data-preview-good>${esc(p.good || 'Conforme')}</span></div>
         <div class="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-nc-bg text-nc-tx font-semibold text-[13px]">${icon('cancel', 'text-[16px]', true)} Não Conf.</div>
-      </div>
-      <button type="button" data-toggle-good class="${hasCustomGood ? 'hidden' : ''} text-[12px] font-semibold text-primary">Personalizar texto de "conforme"</button>
-      <div data-good-custom class="${hasCustomGood ? '' : 'hidden'}">
-        <label class="mono text-[10px] uppercase text-on-surface-variant">Texto quando conforme</label>
-        <input data-pgood placeholder="Conforme" value="${esc(p.good || 'Conforme')}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 text-[13px] border border-transparent focus:border-primary">
       </div>`;
 }
 
@@ -407,10 +403,6 @@ export function renderEditorParams() {
       reqToggle.classList.toggle('on', p.required);
     };
     const del = box.querySelector('[data-del-param]'); if (del) del.onclick = () => { syncEditorParams(); window.__editorParams.splice(i, 1); renderEditorParams(); };
-    const goodInput = box.querySelector('[data-pgood]'), goodPreview = box.querySelector('[data-preview-good]');
-    if (goodInput) goodInput.oninput = () => { goodPreview.textContent = goodInput.value.trim() || 'Conforme'; };
-    const toggleGood = box.querySelector('[data-toggle-good]'), goodCustom = box.querySelector('[data-good-custom]');
-    if (toggleGood) toggleGood.onclick = () => { toggleGood.classList.add('hidden'); goodCustom.classList.remove('hidden'); goodInput.focus(); };
 
     const addOpt = box.querySelector('[data-opt-add]');
     if (addOpt) addOpt.onclick = () => {
@@ -455,7 +447,7 @@ export function syncEditorParams() {
       p.ncOptions = (p.ncOptions || []).map(nc => { const idx = oldOptions.indexOf(nc); return idx >= 0 && newOptions[idx] ? newOptions[idx] : nc; }).filter(nc => newOptions.includes(nc));
       p.options = newOptions;
     } else if (p.type === 'qualitative') {
-      p.good = box.querySelector('[data-pgood]').value || 'Conforme';
+      p.good = p.good || 'Conforme'; // texto do "conforme" não é mais editável; mantém o que já existia
     }
     // texto, simnao, data e hora não têm campos extras além do título
   });
