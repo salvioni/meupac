@@ -17,6 +17,7 @@ auditRouter.get('/verify', authenticate, requireRole('gerente'), (req, res) => {
       values: JSON.parse(s.values_json), conforme: !!s.conforme,
       occurrence: s.occurrence_json ? JSON.parse(s.occurrence_json) : null, note: s.note || '',
     };
+    if (s.slot) payload.slot = s.slot; // registros anteriores aos horários não têm slot no hash
     const expected = recordHash(prevHash, payload);
     if (expected !== s.hash) problems.push({ id: s.id, seq: s.seq, issue: 'hash de conteúdo não confere' });
     if (s.signed_by) {

@@ -124,6 +124,8 @@ function ensureColumn(table, column, ddl) {
 }
 ensureColumn('forms', 'tolerance_min', 'tolerance_min INTEGER NOT NULL DEFAULT 0');
 ensureColumn('forms', 'active', 'active INTEGER NOT NULL DEFAULT 1');
+// horário do dia ("HH:MM") que o envio cumpre, pra planilhas com vários horários
+ensureColumn('submissions', 'slot', 'slot TEXT');
 ensureColumn('pacs', 'description', 'description TEXT');
 ensureColumn('users', 'unidade_id', 'unidade_id TEXT');
 ensureColumn('pacs', 'unidade_id', 'unidade_id TEXT');

@@ -31,7 +31,7 @@ export function submissionOut(s) {
     id: s.id, formId: s.form_id, operatorId: s.operator_id, operatorName: s.operator_name, ts: s.ts,
     values: JSON.parse(s.values_json), conforme: !!s.conforme,
     occurrence: s.occurrence_json ? JSON.parse(s.occurrence_json) : null,
-    note: s.note || '', signedBy: s.signed_by, signedAt: s.signed_at,
+    note: s.note || '', slot: s.slot || null, signedBy: s.signed_by, signedAt: s.signed_at,
     hash: s.hash, prevHash: s.prev_hash, signHash: s.sign_hash,
   };
 }

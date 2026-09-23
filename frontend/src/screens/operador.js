@@ -1,5 +1,6 @@
 import { $, esc, icon, fmtTime, fmtDT, toast, hashFor } from '../helpers.js';
-import { DB, currentUser, params, getForm, getPac, visibleToOperator, pacActive, formActive, formStatus, dueMinutesToday, todaySubFor, dueText, plCode } from '../state.js';
+import { DB, currentUser, params, getForm, getPac, visibleToOperator, pacActive, formActive, todaySubFor, dueText, plCode, formSlots, slotStates, openSlots } from '../state.js';
+import { toMin, usesWindow } from '../schedule.js';
 import { shell, profileTrigger, pcard } from '../ui.js';
 import { OP_NAV, GE_NAV, STATUS_META } from '../config.js';
 import * as api from '../api.js';
@@ -13,44 +14,56 @@ export function setOpFilter(v) { opFilter = v; }
 export function renderOpPac() {
   const uid = currentUser.id;
   const myForms = DB.forms.filter(f => visibleToOperator(f, uid) && formActive(f) && pacActive(getPac(f.pacId)));
-  const rank = st => st === 'atrasado' ? 0 : ['pendente', 'afazer', 'agendado'].includes(st) ? 1 : 2;
-  const dueMin = f => { const m = dueMinutesToday(f); return m === null ? Infinity : m; };
-  const isDone = f => !!todaySubFor(f.id);
 
-  const todo = myForms.filter(f => !isDone(f)).sort((a, b) => rank(formStatus(a)) - rank(formStatus(b)) || dueMin(a) - dueMin(b));
-  const done = myForms.filter(f => isDone(f)).sort((a, b) => new Date(todaySubFor(b.id).ts) - new Date(todaySubFor(a.id).ts));
+  // a lista é de tarefas, não de planilhas: uma planilha com vários horários no dia
+  // (ex.: a cada 2h) aparece uma vez por horário atrasado + o próximo a vencer.
+  const todo = [], done = [];
+  myForms.forEach(f => {
+    if (formSlots(f).length) {
+      openSlots(f).forEach(x => todo.push({ f, slot: x.slot, st: x.status, min: toMin(x.slot) }));
+      slotStates(f).filter(x => x.sub).forEach(x => done.push({ f, slot: x.slot, sub: x.sub }));
+    } else {
+      const sub = todaySubFor(f.id);
+      if (sub) done.push({ f, slot: null, sub }); else todo.push({ f, slot: null, st: 'afazer', min: Infinity });
+    }
+  });
+  todo.sort((a, b) => (a.st === 'atrasado' ? 0 : 1) - (b.st === 'atrasado' ? 0 : 1) || a.min - b.min);
+  done.sort((a, b) => new Date(b.sub.ts) - new Date(a.sub.ts));
 
-  const flatRow = f => {
-    const st = formStatus(f); const pac = getPac(f.pacId); const sub = todaySubFor(f.id);
-    const t = sub ? 'Enviado às ' + fmtTime(sub.ts) : dueText(f);
-    const trailing = sub
-      ? icon('chevron_right', 'text-on-surface-variant flex-none')
-      : (st === 'atrasado'
-        ? `<span class="mono text-[10px] font-bold uppercase px-2 py-1 rounded ${STATUS_META.atrasado.bg} ${STATUS_META.atrasado.tx} flex-none">${STATUS_META.atrasado.label}</span>`
-        : `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">No Prazo</span>`);
+  const freq = f => dueText(f).split(' · ')[0];
+  const row = t => {
+    const { f } = t; const pac = getPac(f.pacId);
+    if (t.sub) return pcard({
+      icon: pac.icon, occ: !!t.sub.occurrence, title: f.title,
+      meta: `<span class="truncate">${t.slot ? `Horário ${t.slot} · ` : ''}Enviado às ${fmtTime(t.sub.ts)}</span>`,
+      trailing: icon('chevron_right', 'text-on-surface-variant flex-none'),
+      open: `data-action="open-sub" data-sub="${t.sub.id}"`,
+    });
     return pcard({
-      icon: pac.icon, occ: st === 'ocorrencia', title: f.title,
-      meta: `${sub ? '' : icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(t)}</span>`,
-      trailing,
-      open: sub ? `data-action="open-sub" data-sub="${sub.id}"` : `data-action="open-form" data-form="${f.id}"`,
+      icon: pac.icon, occ: false, title: f.title,
+      meta: `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${!t.slot ? esc(dueText(f)) : usesWindow(f.schedule) ? `${t.slot} · ${esc(freq(f))}` : `às ${t.slot}`}</span>`,
+      trailing: t.st === 'atrasado'
+        ? `<span class="mono text-[10px] font-bold uppercase px-2 py-1 rounded ${STATUS_META.atrasado.bg} ${STATUS_META.atrasado.tx} flex-none">${STATUS_META.atrasado.label}</span>`
+        : `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">No Prazo</span>`,
+      open: `data-action="open-form" data-form="${f.id}"${t.slot ? ` data-slot="${t.slot}"` : ''}`,
     });
   };
 
-  const all = myForms.slice().sort((a, b) => rank(formStatus(a)) - rank(formStatus(b)) || dueMin(a) - dueMin(b));
+  const all = [...todo, ...done];
   const empty = (ic, t, s) => `<div class="flex flex-col items-center py-14 text-center">${icon(ic, 'text-secondary text-[44px]', true)}<p class="font-semibold text-on-surface mt-2">${t}</p><p class="text-[12px] text-on-surface-variant">${s}</p></div>`;
   const tab = (k, label, n) => { const on = opFilter === k; return `<button data-action="op-filter" data-filter="${k}" class="tap flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[13px] font-semibold ${on ? 'bg-primary text-on-primary' : 'bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant'}">${label}<span class="mono text-[10px] font-bold px-1.5 rounded-full ${on ? 'bg-on-primary/20 text-on-primary' : 'bg-surface-container text-on-surface-variant'}">${n}</span></button>`; };
 
   const list = opFilter === 'afazer' ? todo : opFilter === 'concluidas' ? done : all;
   const body = !list.length
     ? (opFilter === 'afazer' ? empty('task_alt', 'Tudo em dia!', 'Nenhuma planilha pendente no momento.') : empty('inbox', 'Nada por aqui', 'Nenhum registro nesta lista ainda.'))
-    : `<div class="space-y-2">${list.map(flatRow).join('')}</div>`;
+    : `<div class="space-y-2">${list.map(row).join('')}</div>`;
 
   const inner = `<div class="px-4 py-5 space-y-4">
     <div>
       <h1 class="text-[26px] font-bold text-on-surface leading-tight">A Preencher Hoje</h1>
       <p class="text-[13px] text-on-surface-variant">São as planilhas do seu turno para preencher hoje.</p>
     </div>
-    <div class="flex gap-2">${tab('afazer', 'A Fazer', todo.length)}${tab('concluidas', 'Concluídas', done.length)}${tab('todas', 'Todas', myForms.length)}</div>
+    <div class="flex gap-2">${tab('afazer', 'A Fazer', todo.length)}${tab('concluidas', 'Concluídas', done.length)}${tab('todas', 'Todas', all.length)}</div>
     ${body}
   </div>`;
   app().innerHTML = shell(inner, OP_NAV, 'op_pac', profileTrigger());
@@ -60,8 +73,18 @@ export function renderPreencher() {
   const f = getForm(params.form);
   if (!f) { navigate('op_pac'); return; }
   const pac = getPac(f.pacId);
-  const existing = todaySubFor(f.id);
+  const hasSlots = formSlots(f).length > 0;
+  const existing = hasSlots
+    ? ((slotStates(f).find(x => x.slot === params.slot) || {}).sub)
+    : todaySubFor(f.id);
   if (existing) { navigate('op_detalhe', { sub: existing.id }); return; }
+  // sem horário na URL (link antigo/F5), assume o primeiro em aberto
+  if (hasSlots && !formSlots(f).includes(params.slot)) {
+    const open = openSlots(f);
+    if (!open.length) { navigate('op_pac'); return; }
+    params.slot = open[0].slot;
+  }
+  window.__fillSlot = hasSlots ? params.slot : null;
 
   window.__fill = {};
   f.params.forEach(p => { window.__fill[p.id] = null; });
@@ -152,6 +175,7 @@ export function renderPreencher() {
         <span class="mono text-[10px] text-on-surface-variant">${plCode(f)}</span>
       </div>
       <h1 class="text-[24px] font-bold text-on-surface leading-tight">${esc(f.title)}</h1>
+      ${window.__fillSlot ? `<div class="flex items-center gap-1.5 mt-1 text-[12px] text-on-surface-variant">${icon('schedule', 'text-[15px]')} Registro das ${window.__fillSlot}</div>` : ''}
     </div>
     <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-4 flex gap-3">
       ${icon('location_on', 'text-secondary flex-none', true)}
@@ -262,7 +286,7 @@ export async function submitFill() {
   const btn = document.querySelector('[data-action="submit-fill"]');
   if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
   try {
-    await api.createSubmission(f.id, window.__fill, note);
+    await api.createSubmission(f.id, window.__fill, note, window.__fillSlot);
     await api.refreshState();
     toast('Registro enviado e assinado.');
     setOpFilter('afazer');
@@ -307,7 +331,7 @@ export function renderDetalhe() {
         <span class="mono text-[10px] text-on-surface-variant">${plCode(f)}</span>
       </div>
       <h1 class="text-[24px] font-bold text-on-surface leading-tight">${esc(f.title)}</h1>
-      <div class="flex items-center gap-1.5 mt-1 text-[12px] text-on-surface-variant">Enviado em ${fmtDT(sub.ts)} · <span class="text-secondary font-semibold">${sub.signedBy ? 'Assinado' : 'Concluído'}</span></div>
+      <div class="flex items-center gap-1.5 mt-1 text-[12px] text-on-surface-variant">${sub.slot ? `Registro das ${sub.slot} · ` : ''}Enviado em ${fmtDT(sub.ts)} · <span class="text-secondary font-semibold">${sub.signedBy ? 'Assinado' : 'Concluído'}</span></div>
     </div>
     <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-4">
       <div class="flex items-center justify-between mb-1"><div class="flex items-center gap-1.5">${icon('location_on', 'text-secondary text-[18px]', true)}<span class="mono text-[10px] uppercase tracking-wide text-on-surface-variant">Local de Coleta</span></div><span class="mono text-[11px] text-on-surface-variant">${esc(f.sector)}</span></div>

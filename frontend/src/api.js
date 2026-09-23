@@ -72,8 +72,8 @@ export async function fetchTeam() {
   return data.team;
 }
 
-export async function createSubmission(formId, values, note) {
-  const data = await request('/submissions', { method: 'POST', body: { formId, values, note } });
+export async function createSubmission(formId, values, note, slot) {
+  const data = await request('/submissions', { method: 'POST', body: { formId, values, note, slot: slot || null } });
   return data.submission;
 }
 export async function signSubmission(id) {

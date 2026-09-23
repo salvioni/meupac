@@ -4,6 +4,7 @@ import { shell, profileTrigger } from '../ui.js';
 import { GE_NAV } from '../config.js';
 import * as api from '../api.js';
 import { navigate, closeModal } from '../router.js';
+import { daySlots, toMin, usesWindow, DEFAULT_START, DEFAULT_END } from '../schedule.js';
 
 const app = () => $('app');
 
@@ -13,8 +14,8 @@ export function renderFormEditor() {
   window.__editorParams = editing ? JSON.parse(JSON.stringify(editing.params)) : [{ id: 'np' + Date.now(), type: 'numeric', name: '', unit: '', min: 0, max: 0, step: 0.1, seed: 0 }];
   window.__editorTimes = editing ? (editing.times && editing.times.length ? editing.times.slice() : (editing.due ? [editing.due] : [])) : [];
   window.__when = editing && editing.schedule
-    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
-    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), days: [], toleranceMin: 0 };
+    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), start: editing.schedule.start || DEFAULT_START, end: editing.schedule.end || DEFAULT_END, days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
+    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), start: DEFAULT_START, end: DEFAULT_END, days: [], toleranceMin: 0 };
 
   const inner = `<div class="px-4 py-4 space-y-4 pb-8">
     <div class="flex items-center justify-between">
@@ -86,23 +87,19 @@ export function renderWhen() {
   if (w.type === 'fixos') {
     body = `<div id="ed-times" class="flex flex-wrap gap-2"></div>
       <button data-action="add-time" class="tap mt-2 inline-flex items-center gap-1 text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} Adicionar horário</button>
-      <div class="flex items-center gap-2 mt-3">
-        <span class="text-[13px] text-on-surface">Tolerância de</span>
-        <input id="ed-tolerance" type="number" min="0" value="${w.toleranceMin}" class="w-16 bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface text-center border border-transparent focus:border-primary">
-        <span class="text-[13px] text-on-surface">minutos antes de marcar como atrasada</span>
-      </div>`;
+      ${toleranceBlock(w)}`;
   } else if (w.type === 'intervalo') {
     body = `<div class="flex items-center gap-2">
       <span class="text-[13px] text-on-surface">A cada</span>
       <input id="ed-every" type="number" min="1" value="${w.every}" class="w-16 bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface text-center border border-transparent focus:border-primary">
       <select id="ed-unit" class="bg-surface-container-low rounded-lg px-3 py-2 text-[13px] font-semibold text-on-surface border border-transparent focus:border-primary"><option value="horas" ${w.unit === 'horas' ? 'selected' : ''}>horas</option><option value="minutos" ${w.unit === 'minutos' ? 'selected' : ''}>minutos</option></select>
-    </div>`;
+    </div>${windowBlock(w)}`;
   } else if (w.type === 'vezes') {
     body = `<div class="flex items-center gap-2 flex-wrap">
       <input id="ed-count" type="number" min="1" value="${w.count}" class="w-16 bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface text-center border border-transparent focus:border-primary">
       <span class="text-[13px] text-on-surface">vez(es) por</span>
       <select id="ed-period" class="bg-surface-container-low rounded-lg px-3 py-2 text-[13px] font-semibold text-on-surface border border-transparent focus:border-primary"><option value="dia" ${w.period === 'dia' ? 'selected' : ''}>dia</option><option value="semana" ${w.period === 'semana' ? 'selected' : ''}>semana</option><option value="mes" ${w.period === 'mes' ? 'selected' : ''}>mês</option></select>
-    </div><p class="text-[11px] text-on-surface-variant mt-2">Quantidade sem horário fixo (ex.: 3 vezes ao dia).</p>`;
+    </div>${w.period === 'dia' ? windowBlock(w) : `<p class="text-[11px] text-on-surface-variant mt-2">Quantidade sem horário fixo — 1 registro por dia, sem prazo.</p>`}`;
   } else if (w.type === 'momentos') {
     const mo = (v, label) => { const on = w.moments.has(v); return `<button data-action="when-moment" data-m="${v}" class="tap w-full flex items-center justify-between px-3 py-2.5 rounded-lg ${on ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-low text-on-surface'}"><span class="text-[13px] font-medium">${label}</span><span class="material-symbols-outlined ${on ? 'ms-fill text-secondary' : 'text-outline-variant'} text-[20px]">${on ? 'check_circle' : 'radio_button_unchecked'}</span></button>`; };
     body = `<div class="space-y-2">${mo('inicio', 'Início do expediente')}${mo('fim', 'Fim do expediente')}</div>`;
@@ -119,6 +116,9 @@ export function renderWhen() {
     <div class="grid grid-cols-3 gap-2 mt-1">${typeBtn('fixos', 'Fixos', 'schedule')}${typeBtn('intervalo', 'A cada', 'timelapse')}${typeBtn('vezes', 'Vezes', 'repeat')}${typeBtn('momentos', 'Momentos', 'flag')}${typeBtn('demanda', 'Demanda', 'bolt')}</div>
     <div class="mt-3">${body}</div>${daysBlock}`;
   if (w.type === 'fixos') renderEditorTimes();
+  ['ed-unit', 'ed-period'].forEach(id => { const el = $(id); if (el) el.onchange = () => { syncWhen(); renderWhen(); }; });
+  ['ed-every', 'ed-count', 'ed-start', 'ed-end'].forEach(id => { const el = $(id); if (el) el.oninput = () => { syncWhen(); paintSlotPreview(); }; });
+  paintSlotPreview();
   function paintDays() {
     const all = w.days.length === 0;
     document.querySelectorAll('.ad-btn').forEach(b => b.className = 'ad-btn tap text-[12px] font-semibold px-3 py-1.5 rounded-lg ' + (all ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'));
@@ -134,6 +134,45 @@ export function syncWhen() {
   if (w.type === 'fixos') { syncEditorTimes(); const t = $('ed-tolerance'); if (t) w.toleranceMin = Math.max(0, parseInt(t.value, 10) || 0); }
   else if (w.type === 'intervalo') { const e = $('ed-every'), u = $('ed-unit'); if (e) w.every = Math.max(1, parseInt(e.value) || 1); if (u) w.unit = u.value; }
   else if (w.type === 'vezes') { const c = $('ed-count'), pd = $('ed-period'); if (c) w.count = Math.max(1, parseInt(c.value) || 1); if (pd) w.period = pd.value; }
+  const st = $('ed-start'), en = $('ed-end'), tol = $('ed-tolerance');
+  if (st && st.value) w.start = st.value;
+  if (en && en.value) w.end = en.value;
+  if (tol) w.toleranceMin = Math.max(0, parseInt(tol.value, 10) || 0);
+}
+
+function toleranceBlock(w) {
+  return `<div class="flex items-center gap-2 mt-3">
+        <span class="text-[13px] text-on-surface">Tolerância de</span>
+        <input id="ed-tolerance" type="number" min="0" value="${w.toleranceMin}" class="w-16 bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface text-center border border-transparent focus:border-primary">
+        <span class="text-[13px] text-on-surface">minutos antes de marcar como atrasada</span>
+      </div>`;
+}
+
+// janela do dia (início/fim) pra "a cada X horas" e "N vezes ao dia": é o que transforma
+// a frequência em horários concretos, cada um com seu próprio registro.
+function windowBlock(w) {
+  const inp = (id, v) => `<input id="${id}" type="time" step="300" value="${esc(v)}" class="bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface border border-transparent focus:border-primary">`;
+  return `<div class="flex items-center gap-2 mt-3 flex-wrap">
+      <span class="text-[13px] text-on-surface">Das</span>${inp('ed-start', w.start)}
+      <span class="text-[13px] text-on-surface">às</span>${inp('ed-end', w.end)}
+    </div>
+    ${toleranceBlock(w)}
+    <p id="ed-slot-preview" class="text-[11px] text-on-surface-variant mt-2"></p>`;
+}
+
+function whenSchedule(w) {
+  if (w.type === 'intervalo') return { type: 'intervalo', every: w.every, unit: w.unit, start: w.start, end: w.end };
+  if (w.type === 'vezes') return { type: 'vezes', count: w.count, period: w.period, start: w.start, end: w.end };
+  return null;
+}
+
+function paintSlotPreview() {
+  const el = $('ed-slot-preview'); if (!el) return;
+  const w = window.__when;
+  if (!(toMin(w.end) > toMin(w.start))) { el.innerHTML = `<span class="text-error font-semibold">O fim precisa ser depois do início.</span>`; return; }
+  const slots = daySlots(whenSchedule(w));
+  const shown = slots.length > 12 ? slots.slice(0, 12).join(', ') + ', …' : slots.join(', ');
+  el.textContent = `${slots.length} registro${slots.length === 1 ? '' : 's'} por dia: ${shown}`;
 }
 
 function timeSelect(kind, val, i) {
@@ -385,15 +424,17 @@ export async function saveFormEditor() {
   const days = (w.days || []).slice().sort();
   let times = [], due = '', schedule;
   if (w.type === 'fixos') { times = window.__editorTimes.filter(Boolean).sort(); if (!times.length) { toast('Adicione ao menos um horário.', 'err'); return; } due = times[0] || ''; schedule = { type: 'fixos', times, days }; }
-  else if (w.type === 'intervalo') { schedule = { type: 'intervalo', every: w.every, unit: w.unit, days }; }
-  else if (w.type === 'vezes') { schedule = { type: 'vezes', count: w.count, period: w.period, days }; }
+  else if (w.type === 'intervalo' || w.type === 'vezes') {
+    schedule = { ...whenSchedule(w), days };
+    if (usesWindow(schedule) && !(toMin(w.end) > toMin(w.start))) { toast('O horário de fim precisa ser depois do início.', 'err'); return; }
+  }
   else if (w.type === 'momentos') { const moments = [...w.moments]; if (!moments.length) { toast('Selecione ao menos um momento.', 'err'); return; } schedule = { type: 'momentos', moments, days }; }
   else { schedule = { type: 'demanda' }; }
 
   const editing = params.form ? getForm(params.form) : null;
   const loc = $('ed-loc').value.trim() || 'A definir';
   const pac = editing ? getPac(editing.pacId) : getPac(params.pac || DB.pacs[0].id);
-  const toleranceMin = w.type === 'fixos' ? (w.toleranceMin || 0) : 0;
+  const toleranceMin = (w.type === 'fixos' || usesWindow(schedule)) ? (w.toleranceMin || 0) : 0;
   const payload = { pacId: pac.id, title, due, schedule, days, times, location: loc, params: window.__editorParams, toleranceMin };
 
   const btn = document.querySelector('[data-action="save-form"]');

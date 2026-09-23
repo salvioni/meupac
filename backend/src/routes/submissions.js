@@ -3,6 +3,8 @@ import { db } from '../db.js';
 import { authenticate, requireRole } from '../middleware.js';
 import { submissionOut, visibleToOperator } from '../serialize.js';
 import { recordHash, signatureHash } from '../hash.js';
+// mesmo cálculo de horários que a tela usa (módulo puro compartilhado com o frontend)
+import { daySlots } from '../../../frontend/src/schedule.js';
 
 export const submissionsRouter = Router();
 
@@ -26,6 +28,19 @@ submissionsRouter.post('/', authenticate, requireRole('operador'), (req, res) =>
 
   const params = JSON.parse(form.params_json);
   if (!values || typeof values !== 'object') return res.status(400).json({ error: 'Envie os valores medidos.' });
+
+  // planilha com horários (ex.: a cada 2h): cada envio cumpre um horário específico,
+  // que precisa existir e ainda não ter sido registrado hoje.
+  const slots = daySlots(JSON.parse(form.schedule_json || 'null'), JSON.parse(form.times_json || '[]'), form.due);
+  let slot = null;
+  if (slots.length) {
+    slot = String(req.body.slot || '');
+    if (!slots.includes(slot)) return res.status(400).json({ error: 'Horário inválido para esta planilha.' });
+    const today = new Date().toDateString();
+    const taken = db.prepare('SELECT ts FROM submissions WHERE form_id = ? AND slot = ?').all(form.id, slot)
+      .some(r => new Date(r.ts).toDateString() === today);
+    if (taken) return res.status(409).json({ error: `O horário ${slot} desta planilha já foi registrado hoje.` });
+  }
 
   const outValues = {};
   let conforme = true;
@@ -74,11 +89,12 @@ submissionsRouter.post('/', authenticate, requireRole('operador'), (req, res) =>
   const occurrence = conforme ? null : { issues, note: String(note || '') };
   const { prevHash, nextSeq } = lastHash(req.user.unidade_id);
   const payload = { formId, operatorId: req.user.id, operatorName: req.user.name, ts, values: outValues, conforme, occurrence, note: String(note || '') };
+  if (slot) payload.slot = slot; // só entra no hash quando existe (compatível com a cadeia antiga)
   const hash = recordHash(prevHash, payload);
 
-  db.prepare(`INSERT INTO submissions (id,unidade_id,form_id,operator_id,operator_name,ts,values_json,conforme,occurrence_json,note,signed_by,signed_at,prev_hash,hash,sign_hash,seq)
-    VALUES (?,?,?,?,?,?,?,?,?,?,NULL,NULL,?,?,NULL,?)`)
-    .run(id, req.user.unidade_id, formId, req.user.id, req.user.name, ts, JSON.stringify(outValues), conforme ? 1 : 0, occurrence ? JSON.stringify(occurrence) : null, String(note || ''), prevHash, hash, nextSeq);
+  db.prepare(`INSERT INTO submissions (id,unidade_id,form_id,operator_id,operator_name,ts,values_json,conforme,occurrence_json,note,signed_by,signed_at,prev_hash,hash,sign_hash,seq,slot)
+    VALUES (?,?,?,?,?,?,?,?,?,?,NULL,NULL,?,?,NULL,?,?)`)
+    .run(id, req.user.unidade_id, formId, req.user.id, req.user.name, ts, JSON.stringify(outValues), conforme ? 1 : 0, occurrence ? JSON.stringify(occurrence) : null, String(note || ''), prevHash, hash, nextSeq, slot);
 
   const row = db.prepare('SELECT * FROM submissions WHERE id = ?').get(id);
   res.status(201).json({ submission: submissionOut(row) });

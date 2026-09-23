@@ -93,7 +93,7 @@ export function initEventDelegation() {
       case 'save-pass': saveNewPassword(); break;
       case 'unidade': closeModal(); unidadeSheet(); break;
       case 'save-unidade': saveUnidade(); break;
-      case 'open-form': navigate('op_fill', { form: el.dataset.form }); break;
+      case 'open-form': navigate('op_fill', el.dataset.slot ? { form: el.dataset.form, slot: el.dataset.slot } : { form: el.dataset.form }); break;
       case 'submit-fill': submitFill(); break;
       case 'mock-photo': { const t = $('photo-tag'); if (t) { t.classList.remove('hidden'); t.classList.add('flex'); } toast('Foto anexada ao registro.'); break; }
       case 'focus-note': { const n = $('fill-note'); if (n) n.focus(); break; }

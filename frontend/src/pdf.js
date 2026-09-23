@@ -57,7 +57,7 @@ export function recordPdfBlob(sub) {
   }
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(130); doc.text('RASTREABILIDADE E SEGURANCA', L, y); y += 15;
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(40);
-  doc.text(`Registrado por ${sub.operatorName} (Operador) em ${fmtDT(sub.ts)}.`, L, y); y += 14;
+  doc.text(`Registrado por ${sub.operatorName} (Operador) em ${fmtDT(sub.ts)}${sub.slot ? ` — registro das ${sub.slot}` : ''}.`, L, y); y += 14;
   if (sub.signedBy) { doc.text(`Validado por ${sub.signedBy} em ${fmtDT(sub.signedAt)}.`, L, y); y += 14; }
   doc.setFontSize(9); doc.setTextColor(110); doc.text(`Hash de autenticidade: ${hashFor(sub)}`, L, y); y += 22;
   doc.setDrawColor(210); doc.line(L, y, R, y); y += 14;
