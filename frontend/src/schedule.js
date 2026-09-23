@@ -65,11 +65,12 @@ function momentLabel(moment, turno, nTurnos) {
   return nTurnos > 1 ? `${qual} do ${turno.idx + 1}º turno` : `${qual} do expediente`;
 }
 
-// turnos em que uma planilha de "momentos" vale (sem escolha salva = todos)
+// turnos em que uma planilha de "momentos" vale. Sem escolha salva = só o 1º turno
+// (o gestor marca o 2º onde fizer sentido, ex.: barreira sanitária a cada entrada de equipe).
 function momentTurnos(schedule, turnos) {
   const act = activeTurnos(turnos);
-  const chosen = Array.isArray(schedule.turnos) && schedule.turnos.length ? act.filter(t => schedule.turnos.includes(t.idx)) : act;
-  return { act, chosen: chosen.length ? chosen : act };
+  const chosen = Array.isArray(schedule.turnos) && schedule.turnos.length ? act.filter(t => schedule.turnos.includes(t.idx)) : [];
+  return { act, chosen: chosen.length ? chosen : act.slice(0, 1) };
 }
 
 // [{ time: "HH:MM", label }] em ordem de horário. label só existe para "momentos".

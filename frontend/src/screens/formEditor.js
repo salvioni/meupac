@@ -15,7 +15,7 @@ export function renderFormEditor() {
   window.__editorTimes = editing ? (editing.times && editing.times.length ? editing.times.slice() : (editing.due ? [editing.due] : [])) : [];
   const exp = expediente(unitTurnos());
   const es = (editing && editing.schedule) || {};
-  const turnoIdx = activeTurnos(unitTurnos()).map(t => t.idx);
+  const turnoIdx = activeTurnos(unitTurnos()).slice(0, 1).map(t => t.idx); // padrão: só o 1º turno
   window.__when = editing && editing.schedule
     ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), start: es.start || exp.start, end: es.end || exp.end, useExp: !(es.start || es.end), turnos: new Set(es.turnos && es.turnos.length ? es.turnos : turnoIdx), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
     : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), start: exp.start, end: exp.end, useExp: true, turnos: new Set(turnoIdx), days: [], toleranceMin: 0 };
