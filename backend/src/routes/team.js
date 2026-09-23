@@ -55,7 +55,7 @@ teamRouter.put('/:id', authenticate, requireRole('gerente'), (req, res) => {
   if (!target) return res.status(404).json({ error: 'Colaborador não encontrado.' });
   if (!canManage(req.user, target)) return res.status(403).json({ error: 'Você não pode editar este colaborador.' });
 
-  const { role, ownedFormIds } = req.body || {};
+  const { role, ownedFormIds, turnoIdx } = req.body || {};
   const newRole = role === 'gerente' ? 'gerente' : 'operador';
   // promover alguém a gestor é uma escalação de privilégio — só o titular decide isso,
   // mesmo que o ator já pudesse editar esse colaborador enquanto operador
@@ -63,6 +63,11 @@ teamRouter.put('/:id', authenticate, requireRole('gerente'), (req, res) => {
     return res.status(403).json({ error: 'Somente o titular pode promover alguém a gestor.' });
   }
   db.prepare('UPDATE users SET role = ? WHERE id = ?').run(newRole, target.id);
+  // turno: 0 = 1º, 1 = 2º, null = ambos (só vale pra operador; gestor vê tudo)
+  if (turnoIdx !== undefined) {
+    const t = turnoIdx === 0 || turnoIdx === 1 ? turnoIdx : null;
+    db.prepare('UPDATE users SET turno_idx = ? WHERE id = ?').run(newRole === 'operador' ? t : null, target.id);
+  }
 
   if (newRole === 'operador' && Array.isArray(ownedFormIds)) {
     const validFormIds = new Set(db.prepare('SELECT id FROM forms WHERE unidade_id = ?').all(req.user.unidade_id).map(r => r.id));

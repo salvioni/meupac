@@ -1,5 +1,13 @@
 import { $, esc, icon, toast } from '../helpers.js';
-import { DB, currentUser, isTitular, getPac, pacActive, dueText, plCode } from '../state.js';
+import { DB, currentUser, isTitular, getPac, pacActive, dueText, plCode, unitTurnos } from '../state.js';
+import { activeTurnos } from '../schedule.js';
+
+// nome do turno de um operador (só faz sentido com 2 turnos ligados na unidade)
+function turnoName(t) {
+  const act = activeTurnos(unitTurnos());
+  if (act.length < 2) return '';
+  return act.some(x => x.idx === t.turnoIdx) ? `${t.turnoIdx + 1}º turno` : 'Ambos os turnos';
+}
 import { shell, profileTrigger } from '../ui.js';
 import { GE_NAV } from '../config.js';
 import * as api from '../api.js';
@@ -18,7 +26,7 @@ export async function renderEquipe() {
       <div class="relative flex-none"><span class="w-9 h-9 rounded-full flex items-center justify-center font-mono text-[11px] font-bold" style="background:${t.color || '#dfe9fb'};color:${t.ink || '#0f2642'}">${t.initials || '·'}</span></div>
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-on-surface text-[14px] truncate">${esc(t.name)}${isSelf ? ' (você)' : ''}</div>
-        ${isOp ? `<div class="flex items-center gap-1 text-[11px] text-on-surface-variant mt-0.5"><span class="truncate">${t.ownedFormIds.length} planilha${t.ownedFormIds.length !== 1 ? 's' : ''} autorizada${t.ownedFormIds.length !== 1 ? 's' : ''}</span></div>` : ''}
+        ${isOp ? `<div class="flex items-center gap-1 text-[11px] text-on-surface-variant mt-0.5"><span class="truncate">${turnoName(t) ? `${turnoName(t)} · ` : ''}${t.ownedFormIds.length} planilha${t.ownedFormIds.length !== 1 ? 's' : ''} autorizada${t.ownedFormIds.length !== 1 ? 's' : ''}</span></div>` : ''}
       </div>
       <div class="flex items-center gap-2 flex-none">
         ${isTitular(t) ? `<span class="mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-primary text-on-primary">Admin</span>` : isOp ? `<span class="mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">Operador</span>` : `<span class="mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-inverse-primary text-primary">Gestor</span>`}
@@ -79,7 +87,7 @@ export async function confirmInvite() {
 
 export function editMemberSheet(id) {
   const t = DB.team.find(x => x.id === id); if (!t) return;
-  window.__edit = { id: t.id, role: t.role, owned: new Set(t.ownedFormIds || []) };
+  window.__edit = { id: t.id, role: t.role, owned: new Set(t.ownedFormIds || []), turno: t.turnoIdx ?? null };
   renderEditSheet();
 }
 
@@ -108,6 +116,12 @@ export function renderEditSheet() {
       </div>
     </div>`;
   }).join('');
+  // turno do operador: define quais horários ele vê (início do seu turno, a cada 2h dentro do seu turno…)
+  const act = activeTurnos(unitTurnos());
+  const turnoBtn = (v, label, sub) => { const on = e.turno === v; return `<button data-edit-turno="${v === null ? '' : v}" class="tap flex-1 flex flex-col items-center py-2 rounded-lg text-[12px] font-semibold ${on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${label}${sub ? `<span class="mono text-[10px] font-normal opacity-80">${sub}</span>` : ''}</button>`; };
+  const turnoSection = act.length < 2 ? '' : `<p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mt-4 mb-2">Turno</p>
+      <div class="flex gap-2">${act.map(x => turnoBtn(x.idx, `${x.idx + 1}º turno`, `${x.inicio}–${x.fim}`)).join('')}${turnoBtn(null, 'Ambos', '')}</div>
+      <p class="text-[11px] text-on-surface-variant mt-1">Ele vê só os horários do seu turno. Horários dos turnos em Dados da unidade.</p>`;
   const formsSection = pacBlocks || `<div class="mt-3 flex items-center gap-2 bg-surface-container rounded-lg p-3 text-on-surface-variant text-[12px]">${icon('info', 'text-[18px] flex-none')} Nenhum PAC ativo com planilhas definidas ainda.</div>`;
   $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-center justify-center p-4" data-close-modal>
     <div class="absolute inset-0 bg-black/40" data-close-modal></div>
@@ -122,10 +136,16 @@ export function renderEditSheet() {
       ${currentUser.titular ? '' : `<p class="mono text-[10px] text-on-surface-variant mt-1">Somente o titular pode promover alguém a gestor.</p>`}
       ${e.role === 'operador'
         ? `<div class="mt-4 flex items-start gap-2 bg-surface-container rounded-lg p-3 text-on-surface-variant text-[12px]">${icon('engineering', 'text-primary text-[18px] flex-none', true)}<span>O operador preenche e assina digitalmente, no seu turno, apenas as planilhas autorizadas abaixo. Não acessa o painel de gestão, o histórico da fábrica nem assina planilhas de outros.</span></div>
+           ${turnoSection}
            <p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mt-4 mb-1">Planilhas Permitidas · <span id="owned-count">${e.owned.size}</span></p>${formsSection}`
         : `<div class="mt-4 flex items-start gap-2 bg-inverse-primary rounded-lg p-3 text-primary text-[12px]">${icon('verified_user', 'text-[18px] flex-none', true)}<span>O gestor valida e assina as planilhas, acompanha o painel e o histórico de toda a unidade e gerencia os operadores. Não preenche planilhas — isso é do operador.</span></div>`}
       <button data-action="save-member" class="tap w-full mt-4 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px]">Salvar acessos</button>
     </div></div>`;
+  document.querySelectorAll('[data-edit-turno]').forEach(b => b.onclick = () => {
+    const sc = b.closest('.overflow-y-auto'), y = sc ? sc.scrollTop : 0;
+    e.turno = b.dataset.editTurno === '' ? null : +b.dataset.editTurno; renderEditSheet();
+    const sc2 = document.querySelector('#modal-root .overflow-y-auto'); if (sc2) sc2.scrollTop = y;
+  });
 }
 
 // alterna o acesso sem re-renderizar o popup inteiro: só troca o ícone de check
@@ -159,7 +179,7 @@ export function toggleFormAccess(formId) {
 export async function saveMember() {
   const e = window.__edit;
   try {
-    await api.updateMember(e.id, e.role, [...e.owned]);
+    await api.updateMember(e.id, e.role, [...e.owned], e.turno);
     await api.refreshState();
     closeModal();
     await renderEquipe();

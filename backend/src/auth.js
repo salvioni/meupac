@@ -28,7 +28,7 @@ export function publicUser(row) {
   if (!row) return null;
   return {
     id: row.id, name: row.name, username: row.username, role: row.role,
-    titular: !!row.titular, cargo: row.cargo, turno: row.turno, matricula: row.matricula,
+    titular: !!row.titular, cargo: row.cargo, turno: row.turno, turnoIdx: row.turno_idx ?? null, matricula: row.matricula,
     initials: row.initials, color: row.color, ink: row.ink,
   };
 }

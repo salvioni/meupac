@@ -1,5 +1,5 @@
 import { isToday } from './helpers.js';
-import { daySlots, slotLabels, toMin, usesWindow, activeOn, windowText, momentsText } from './schedule.js';
+import { daySlots, slotInfo, toMin, usesWindow, activeOn, windowText, momentsText, activeTurnos } from './schedule.js';
 
 // Cache local do estado vindo do backend (substitui o antigo objeto persistido
 // em localStorage). É preenchido por api.refreshState() e só isso — nenhuma
@@ -38,7 +38,7 @@ export function activeToday(f) { return activeOn(f.schedule, f.days); }
 // existir (ex.: turno desligado) não é reaproveitado para outro horário.
 export function slotStates(f) {
   const slots = formSlots(f); if (!slots.length) return [];
-  const labels = slotLabels(f.schedule, f.times, f.due, unitTurnos());
+  const info = Object.fromEntries(slotInfo(f.schedule, f.times, f.due, unitTurnos()).map(x => [x.time, x]));
   const subs = subsFor(f.id).filter(s => isToday(s.ts)).sort((a, b) => new Date(a.ts) - new Date(b.ts));
   const bySlot = new Map();
   subs.forEach(s => { if (s.slot && slots.includes(s.slot) && !bySlot.has(s.slot)) bySlot.set(s.slot, s); });
@@ -52,17 +52,26 @@ export function slotStates(f) {
   return slots.map(slot => {
     const sub = bySlot.get(slot) || null;
     const status = sub ? (sub.occurrence ? 'ocorrencia' : 'concluido') : nowMin > toMin(slot) + (f.toleranceMin || 0) ? 'atrasado' : 'afazer';
-    return { slot, sub, status, label: labels[slot] || null };
+    return { slot, sub, status, label: info[slot].label || null, turnos: info[slot].turnos };
   });
 }
 
-// o que o operador precisa fazer agora: os horários atrasados + o próximo a vencer
-export function openSlots(f) {
+// o que o operador precisa fazer agora: os horários atrasados + o próximo a vencer.
+// keep filtra os horários (ex.: só os do turno da pessoa) antes de escolher o próximo.
+export function openSlots(f, keep = () => true) {
   if (!activeToday(f)) return [];
-  const pending = slotStates(f).filter(x => !x.sub);
+  const pending = slotStates(f).filter(x => !x.sub && keep(x));
   const late = pending.filter(x => x.status === 'atrasado');
   const next = pending.find(x => x.status !== 'atrasado');
   return next ? [...late, next] : late;
+}
+
+// cada operador vê só os horários do seu turno; sem turno definido (ambos), ou com a
+// unidade num turno só, vê tudo. Horário fora de qualquer turno vale pra todos.
+export function slotVisibleTo(user) {
+  const act = activeTurnos(unitTurnos()).map(t => t.idx);
+  const my = user && user.role === 'operador' && act.length > 1 && act.includes(user.turnoIdx) ? user.turnoIdx : null;
+  return x => my === null || !x.turnos.length || x.turnos.includes(my);
 }
 
 // prazo (minutos desde 00:00) do próximo horário em aberto — só pra ordenar listas

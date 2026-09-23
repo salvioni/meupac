@@ -84,7 +84,7 @@ function slotList(schedule, times, due, turnos) {
   } else if (type === 'momentos') {
     const { act, chosen } = momentTurnos(schedule, turnos);
     const moments = (schedule.moments || []).filter(m => m === 'inicio' || m === 'fim');
-    chosen.forEach(t => moments.forEach(m => out.push({ min: toMin(m === 'fim' ? t.fim : t.inicio), label: momentLabel(m, t, act.length) })));
+    chosen.forEach(t => moments.forEach(m => out.push({ min: toMin(m === 'fim' ? t.fim : t.inicio), label: momentLabel(m, t, act.length), turno: t.idx })));
   } else if (usesWindow(schedule)) {
     const win = windowOf(schedule, turnos); if (!win) return [];
     if (type === 'intervalo') {
@@ -100,16 +100,32 @@ function slotList(schedule, times, due, turnos) {
   // com os dois rótulos
   const byMin = new Map();
   out.filter(x => x.min !== null).forEach(x => {
+    const turnosDoSlot = x.turno !== undefined ? [x.turno] : turnoAt(x.min, turnos);
     const prev = byMin.get(x.min);
-    if (!prev) byMin.set(x.min, { ...x });
-    else if (x.label && prev.label !== x.label) prev.label = prev.label ? `${prev.label} / ${x.label}` : x.label;
+    if (!prev) byMin.set(x.min, { ...x, turnos: turnosDoSlot });
+    else {
+      if (x.label && prev.label !== x.label) prev.label = prev.label ? `${prev.label} / ${x.label}` : x.label;
+      turnosDoSlot.forEach(i => { if (!prev.turnos.includes(i)) prev.turnos.push(i); });
+    }
   });
-  return [...byMin.values()].sort((a, b) => a.min - b.min).map(x => ({ time: fromMin(x.min), label: x.label }));
+  return [...byMin.values()].sort((a, b) => a.min - b.min).map(x => ({ time: fromMin(x.min), label: x.label, turnos: x.turnos }));
+}
+
+// a qual turno pertence um horário: o que o contém (início ≤ h < fim); o fim do
+// último turno conta como dele. Fora de qualquer turno = [] (vale pra todos).
+function turnoAt(min, turnos) {
+  const act = activeTurnos(turnos);
+  const t = act.find(t => min >= toMin(t.inicio) && min < toMin(t.fim)) || act.find(t => min === toMin(t.fim));
+  return t ? [t.idx] : [];
 }
 
 // times/due: campos legados da planilha (antes de existir schedule.times)
 export function daySlots(schedule, times, due, turnos) {
   return slotList(schedule, times, due, turnos).map(x => x.time);
+}
+// [{ time, label, turnos: [idx…] }] — pra saber a quem mostrar cada horário
+export function slotInfo(schedule, times, due, turnos) {
+  return slotList(schedule, times, due, turnos);
 }
 export function slotLabels(schedule, times, due, turnos) {
   const map = {};

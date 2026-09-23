@@ -109,8 +109,8 @@ export async function deleteForm(id) {
 export async function inviteMember(name, username, role) {
   return request('/team', { method: 'POST', body: { name, username, role } });
 }
-export async function updateMember(id, role, ownedFormIds) {
-  const data = await request(`/team/${id}`, { method: 'PUT', body: { role, ownedFormIds } });
+export async function updateMember(id, role, ownedFormIds, turnoIdx = null) {
+  const data = await request(`/team/${id}`, { method: 'PUT', body: { role, ownedFormIds, turnoIdx } });
   return data.member;
 }
 export async function deleteMember(id) {

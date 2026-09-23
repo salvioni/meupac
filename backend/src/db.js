@@ -128,6 +128,14 @@ ensureColumn('forms', 'active', 'active INTEGER NOT NULL DEFAULT 1');
 ensureColumn('submissions', 'slot', 'slot TEXT');
 // turnos do expediente da unidade: [{ inicio, fim, ativo }] (null = padrão de schedule.js)
 ensureColumn('unidade', 'turnos_json', 'turnos_json TEXT');
+// turno de cada pessoa: 0 = 1º, 1 = 2º, NULL = ambos. Na criação da coluna, aproveita
+// o texto livre antigo ("Turno Manhã"/"Turno Tarde") — só dessa vez, pra não desfazer
+// depois uma escolha de "ambos".
+if (!db.prepare('PRAGMA table_info(users)').all().some(c => c.name === 'turno_idx')) {
+  db.exec('ALTER TABLE users ADD COLUMN turno_idx INTEGER');
+  db.exec("UPDATE users SET turno_idx = 0 WHERE turno LIKE '%manh%'");
+  db.exec("UPDATE users SET turno_idx = 1 WHERE turno LIKE '%tarde%'");
+}
 ensureColumn('pacs', 'description', 'description TEXT');
 ensureColumn('users', 'unidade_id', 'unidade_id TEXT');
 ensureColumn('pacs', 'unidade_id', 'unidade_id TEXT');
@@ -245,6 +253,7 @@ function seedIfEmpty() {
   insUser.run('u_marcos', unidadeId, 'Marcos Andrade', 'marcos', hash('meupac123'), 'gerente', 0, 'Supervisor de Qualidade', null, null, 'MA', '#dfe9fb', '#0f2642');
   insUser.run('u_carlos', unidadeId, 'Carlos Mendes', 'carlos', hash('meupac123'), 'operador', 0, null, 'Turno Tarde', null, 'CM', '#88d7ab', '#0d5537');
   insUser.run('u_mariana', unidadeId, 'Mariana Rocha', 'mariana', hash('meupac123'), 'operador', 0, null, 'Turno Manhã', null, 'MR', '#ffb77d', '#6e3900');
+  db.prepare("UPDATE users SET turno_idx = CASE WHEN turno LIKE '%manh%' THEN 0 WHEN turno LIKE '%tarde%' THEN 1 END WHERE unidade_id = ?").run(unidadeId);
 
   seedPacsFor(unidadeId, ['pac01', 'pac02', 'pac03', 'pac04', 'pac05', 'pac06', 'pac07', 'pac08', 'pac09', 'pac10', 'pac11', 'pac12', 'pac13', 'pac14', 'pac15']);
 

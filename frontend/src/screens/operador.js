@@ -1,5 +1,5 @@
 import { $, esc, icon, fmtTime, fmtDT, toast, hashFor, isToday } from '../helpers.js';
-import { DB, currentUser, params, getForm, getPac, visibleToOperator, pacActive, formActive, todaySubFor, dueText, plCode, formSlots, slotStates, openSlots, activeToday, subsFor } from '../state.js';
+import { DB, currentUser, params, getForm, getPac, visibleToOperator, pacActive, formActive, todaySubFor, dueText, plCode, formSlots, slotStates, openSlots, activeToday, subsFor, slotVisibleTo } from '../state.js';
 import { toMin, usesWindow } from '../schedule.js';
 import { shell, profileTrigger, pcard } from '../ui.js';
 import { OP_NAV, GE_NAV, STATUS_META } from '../config.js';
@@ -17,15 +17,17 @@ export function renderOpPac() {
 
   // a lista é de tarefas, não de planilhas: uma planilha com vários horários no dia
   // (ex.: a cada 2h) aparece uma vez por horário atrasado + o próximo a vencer.
+  // com 2 turnos, cada um vê só os horários do seu turno (+ o que ele mesmo enviou)
+  const keep = slotVisibleTo(currentUser);
   const todo = [], done = [];
   myForms.forEach(f => {
     if (formSlots(f).length) {
-      openSlots(f).forEach(x => todo.push({ f, slot: x.slot, label: x.label, st: x.status, min: toMin(x.slot) }));
+      openSlots(f, keep).forEach(x => todo.push({ f, slot: x.slot, label: x.label, st: x.status, min: toMin(x.slot) }));
       const states = slotStates(f);
-      states.filter(x => x.sub).forEach(x => done.push({ f, slot: x.slot, label: x.label, sub: x.sub }));
+      states.filter(x => x.sub && (keep(x) || x.sub.operatorId === uid)).forEach(x => done.push({ f, slot: x.slot, label: x.label, sub: x.sub }));
       // enviados hoje para um horário que não existe mais (ex.: turno desligado) continuam listados
       const used = new Set(states.filter(x => x.sub).map(x => x.sub.id));
-      subsFor(f.id).filter(s => isToday(s.ts) && !used.has(s.id)).forEach(s => done.push({ f, slot: s.slot, label: null, sub: s }));
+      subsFor(f.id).filter(s => isToday(s.ts) && !used.has(s.id) && s.operatorId === uid).forEach(s => done.push({ f, slot: s.slot, label: null, sub: s }));
     } else {
       const sub = todaySubFor(f.id);
       if (sub) done.push({ f, slot: null, sub }); else if (activeToday(f)) todo.push({ f, slot: null, st: 'afazer', min: Infinity });
@@ -88,7 +90,7 @@ export function renderPreencher() {
   if (existing) { navigate('op_detalhe', { sub: existing.id }); return; }
   // sem horário na URL (link antigo/F5), assume o primeiro em aberto
   if (hasSlots && !formSlots(f).includes(params.slot)) {
-    const open = openSlots(f);
+    const open = openSlots(f, slotVisibleTo(currentUser));
     if (!open.length) { navigate('op_pac'); return; }
     params.slot = open[0].slot;
   }
