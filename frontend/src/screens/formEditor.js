@@ -1,10 +1,10 @@
 import { $, esc, icon, toast } from '../helpers.js';
-import { params, getForm, getPac, DB, nextPlNum, revLabel } from '../state.js';
+import { params, getForm, getPac, DB, nextPlNum, revLabel, unitTurnos } from '../state.js';
 import { shell, profileTrigger } from '../ui.js';
 import { GE_NAV } from '../config.js';
 import * as api from '../api.js';
 import { navigate, closeModal } from '../router.js';
-import { daySlots, toMin, usesWindow, DEFAULT_START, DEFAULT_END } from '../schedule.js';
+import { daySlots, slotLabels, toMin, usesWindow, expediente, activeTurnos } from '../schedule.js';
 
 const app = () => $('app');
 
@@ -13,9 +13,12 @@ export function renderFormEditor() {
   const pac = editing ? getPac(editing.pacId) : getPac(params.pac || DB.pacs[0].id);
   window.__editorParams = editing ? JSON.parse(JSON.stringify(editing.params)) : [{ id: 'np' + Date.now(), type: 'numeric', name: '', unit: '', min: 0, max: 0, step: 0.1, seed: 0 }];
   window.__editorTimes = editing ? (editing.times && editing.times.length ? editing.times.slice() : (editing.due ? [editing.due] : [])) : [];
+  const exp = expediente(unitTurnos());
+  const es = (editing && editing.schedule) || {};
+  const turnoIdx = activeTurnos(unitTurnos()).map(t => t.idx);
   window.__when = editing && editing.schedule
-    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), start: editing.schedule.start || DEFAULT_START, end: editing.schedule.end || DEFAULT_END, days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
-    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), start: DEFAULT_START, end: DEFAULT_END, days: [], toleranceMin: 0 };
+    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), start: es.start || exp.start, end: es.end || exp.end, useExp: !(es.start || es.end), turnos: new Set(es.turnos && es.turnos.length ? es.turnos : turnoIdx), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
+    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), start: exp.start, end: exp.end, useExp: true, turnos: new Set(turnoIdx), days: [], toleranceMin: 0 };
 
   const inner = `<div class="px-4 py-4 space-y-4 pb-8">
     <div class="flex items-center justify-between">
@@ -102,7 +105,13 @@ export function renderWhen() {
     </div>${w.period === 'dia' ? windowBlock(w) : `<p class="text-[11px] text-on-surface-variant mt-2">Quantidade sem horário fixo — 1 registro por dia, sem prazo.</p>`}`;
   } else if (w.type === 'momentos') {
     const mo = (v, label) => { const on = w.moments.has(v); return `<button data-action="when-moment" data-m="${v}" class="tap w-full flex items-center justify-between px-3 py-2.5 rounded-lg ${on ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-low text-on-surface'}"><span class="text-[13px] font-medium">${label}</span><span class="material-symbols-outlined ${on ? 'ms-fill text-secondary' : 'text-outline-variant'} text-[20px]">${on ? 'check_circle' : 'radio_button_unchecked'}</span></button>`; };
-    body = `<div class="space-y-2">${mo('inicio', 'Início do expediente')}${mo('fim', 'Fim do expediente')}</div>`;
+    const act = activeTurnos(unitTurnos()), multi = act.length > 1;
+    const chip = t => { const on = w.turnos.has(t.idx); return `<button data-when-turno="${t.idx}" class="tap flex-1 px-3 py-2 rounded-lg text-[12px] font-semibold ${on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${t.idx + 1}º turno <span class="mono font-normal opacity-80">${t.inicio}–${t.fim}</span></button>`; };
+    body = `<div class="space-y-2">${mo('inicio', multi ? 'Início do turno' : 'Início do expediente')}${mo('fim', multi ? 'Fim do turno' : 'Fim do expediente')}</div>
+      ${multi ? `<label class="mono text-[10px] uppercase text-on-surface-variant block mt-3">Em quais turnos</label><div class="flex gap-2 mt-1">${act.map(chip).join('')}</div>` : ''}
+      ${toleranceBlock(w)}
+      <p id="ed-slot-preview" class="text-[11px] text-on-surface-variant mt-2"></p>
+      <p class="text-[11px] text-on-surface-variant mt-1">Os horários dos turnos ficam em Dados da unidade.</p>`;
   } else {
     body = `<div class="flex items-start gap-2 bg-surface-container-low rounded-lg p-3 text-[12px] text-on-surface-variant">${icon('bolt', 'text-[18px] flex-none')}<span>Sem horário específico — preenchida quando houver demanda.</span></div>`;
   }
@@ -117,6 +126,12 @@ export function renderWhen() {
     <div class="mt-3">${body}</div>${daysBlock}`;
   if (w.type === 'fixos') renderEditorTimes();
   ['ed-unit', 'ed-period'].forEach(id => { const el = $(id); if (el) el.onchange = () => { syncWhen(); renderWhen(); }; });
+  document.querySelectorAll('[data-when-turno]').forEach(b => b.onclick = () => {
+    syncWhen(); const i = +b.dataset.whenTurno;
+    if (w.turnos.has(i)) { if (w.turnos.size > 1) w.turnos.delete(i); } else w.turnos.add(i);
+    renderWhen();
+  });
+  const ue = $('ed-useexp'); if (ue) ue.onclick = () => { syncWhen(); w.useExp = !w.useExp; if (w.useExp) { const e = expediente(unitTurnos()); w.start = e.start; w.end = e.end; } renderWhen(); };
   ['ed-every', 'ed-count', 'ed-start', 'ed-end'].forEach(id => { const el = $(id); if (el) el.oninput = () => { syncWhen(); paintSlotPreview(); }; });
   paintSlotPreview();
   function paintDays() {
@@ -152,25 +167,39 @@ function toleranceBlock(w) {
 // a frequência em horários concretos, cada um com seu próprio registro.
 function windowBlock(w) {
   const inp = (id, v) => `<input id="${id}" type="time" step="300" value="${esc(v)}" class="bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface border border-transparent focus:border-primary">`;
-  return `<div class="flex items-center gap-2 mt-3 flex-wrap">
+  const exp = expediente(unitTurnos());
+  return `<div class="flex items-center gap-3 mt-3">
+      <span id="ed-useexp" class="toggle ${w.useExp ? 'on' : ''} flex-none cursor-pointer"></span>
+      <span class="text-[13px] text-on-surface">Seguir o expediente <span class="mono text-on-surface-variant">(${exp.start}–${exp.end})</span></span>
+    </div>
+    ${w.useExp ? '' : `<div class="flex items-center gap-2 mt-3 flex-wrap">
       <span class="text-[13px] text-on-surface">Das</span>${inp('ed-start', w.start)}
       <span class="text-[13px] text-on-surface">às</span>${inp('ed-end', w.end)}
-    </div>
+    </div>`}
     ${toleranceBlock(w)}
     <p id="ed-slot-preview" class="text-[11px] text-on-surface-variant mt-2"></p>`;
 }
 
+// sem start/end = segue o expediente da unidade (muda junto se os turnos mudarem)
 function whenSchedule(w) {
-  if (w.type === 'intervalo') return { type: 'intervalo', every: w.every, unit: w.unit, start: w.start, end: w.end };
-  if (w.type === 'vezes') return { type: 'vezes', count: w.count, period: w.period, start: w.start, end: w.end };
+  const win = w.useExp ? {} : { start: w.start, end: w.end };
+  if (w.type === 'intervalo') return { type: 'intervalo', every: w.every, unit: w.unit, ...win };
+  if (w.type === 'vezes') return { type: 'vezes', count: w.count, period: w.period, ...win };
+  if (w.type === 'momentos') return { type: 'momentos', moments: [...w.moments], turnos: [...w.turnos].sort() };
   return null;
 }
 
 function paintSlotPreview() {
   const el = $('ed-slot-preview'); if (!el) return;
   const w = window.__when;
-  if (!(toMin(w.end) > toMin(w.start))) { el.innerHTML = `<span class="text-error font-semibold">O fim precisa ser depois do início.</span>`; return; }
-  const slots = daySlots(whenSchedule(w));
+  if (w.type !== 'momentos' && !w.useExp && !(toMin(w.end) > toMin(w.start))) { el.innerHTML = `<span class="text-error font-semibold">O fim precisa ser depois do início.</span>`; return; }
+  const sch = whenSchedule(w);
+  const slots = daySlots(sch, [], '', unitTurnos());
+  if (w.type === 'momentos') {
+    const labels = slotLabels(sch, [], '', unitTurnos());
+    el.textContent = slots.length ? slots.map(t => `${labels[t]} (${t})`).join(' · ') : 'Selecione início e/ou fim.';
+    return;
+  }
   const shown = slots.length > 12 ? slots.slice(0, 12).join(', ') + ', …' : slots.join(', ');
   el.textContent = `${slots.length} registro${slots.length === 1 ? '' : 's'} por dia: ${shown}`;
 }
@@ -426,15 +455,15 @@ export async function saveFormEditor() {
   if (w.type === 'fixos') { times = window.__editorTimes.filter(Boolean).sort(); if (!times.length) { toast('Adicione ao menos um horário.', 'err'); return; } due = times[0] || ''; schedule = { type: 'fixos', times, days }; }
   else if (w.type === 'intervalo' || w.type === 'vezes') {
     schedule = { ...whenSchedule(w), days };
-    if (usesWindow(schedule) && !(toMin(w.end) > toMin(w.start))) { toast('O horário de fim precisa ser depois do início.', 'err'); return; }
+    if (usesWindow(schedule) && !w.useExp && !(toMin(w.end) > toMin(w.start))) { toast('O horário de fim precisa ser depois do início.', 'err'); return; }
   }
-  else if (w.type === 'momentos') { const moments = [...w.moments]; if (!moments.length) { toast('Selecione ao menos um momento.', 'err'); return; } schedule = { type: 'momentos', moments, days }; }
+  else if (w.type === 'momentos') { if (!w.moments.size) { toast('Selecione ao menos um momento.', 'err'); return; } schedule = { ...whenSchedule(w), days }; }
   else { schedule = { type: 'demanda' }; }
 
   const editing = params.form ? getForm(params.form) : null;
   const loc = $('ed-loc').value.trim() || 'A definir';
   const pac = editing ? getPac(editing.pacId) : getPac(params.pac || DB.pacs[0].id);
-  const toleranceMin = (w.type === 'fixos' || usesWindow(schedule)) ? (w.toleranceMin || 0) : 0;
+  const toleranceMin = (w.type === 'fixos' || w.type === 'momentos' || usesWindow(schedule)) ? (w.toleranceMin || 0) : 0;
   const payload = { pacId: pac.id, title, due, schedule, days, times, location: loc, params: window.__editorParams, toleranceMin };
 
   const btn = document.querySelector('[data-action="save-form"]');

@@ -109,7 +109,7 @@ export function initEventDelegation() {
       case 'add-time': syncEditorTimes(); window.__editorTimes.push(''); renderEditorTimes(); break;
       case 'del-time': syncEditorTimes(); window.__editorTimes.splice(+el.dataset.idx, 1); renderEditorTimes(); break;
       case 'when-type': syncWhen(); window.__when.type = el.dataset.type; renderWhen(); break;
-      case 'when-moment': { const s = window.__when.moments; const mm = el.dataset.m; s.has(mm) ? s.delete(mm) : s.add(mm); renderWhen(); break; }
+      case 'when-moment': { syncWhen(); const s = window.__when.moments; const mm = el.dataset.m; s.has(mm) ? s.delete(mm) : s.add(mm); renderWhen(); break; }
       case 'save-form': saveFormEditor(); break;
       case 'delete-form': confirmDeleteForm(el.dataset.form); break;
       case 'del-form-confirm': deleteFormConfirmed(el.dataset.form); break;

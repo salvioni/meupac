@@ -1,5 +1,5 @@
-import { $, esc, icon, fmtTime, fmtDT, toast, hashFor } from '../helpers.js';
-import { DB, currentUser, params, getForm, getPac, visibleToOperator, pacActive, formActive, todaySubFor, dueText, plCode, formSlots, slotStates, openSlots, activeToday } from '../state.js';
+import { $, esc, icon, fmtTime, fmtDT, toast, hashFor, isToday } from '../helpers.js';
+import { DB, currentUser, params, getForm, getPac, visibleToOperator, pacActive, formActive, todaySubFor, dueText, plCode, formSlots, slotStates, openSlots, activeToday, subsFor } from '../state.js';
 import { toMin, usesWindow } from '../schedule.js';
 import { shell, profileTrigger, pcard } from '../ui.js';
 import { OP_NAV, GE_NAV, STATUS_META } from '../config.js';
@@ -20,8 +20,12 @@ export function renderOpPac() {
   const todo = [], done = [];
   myForms.forEach(f => {
     if (formSlots(f).length) {
-      openSlots(f).forEach(x => todo.push({ f, slot: x.slot, st: x.status, min: toMin(x.slot) }));
-      slotStates(f).filter(x => x.sub).forEach(x => done.push({ f, slot: x.slot, sub: x.sub }));
+      openSlots(f).forEach(x => todo.push({ f, slot: x.slot, label: x.label, st: x.status, min: toMin(x.slot) }));
+      const states = slotStates(f);
+      states.filter(x => x.sub).forEach(x => done.push({ f, slot: x.slot, label: x.label, sub: x.sub }));
+      // enviados hoje para um horário que não existe mais (ex.: turno desligado) continuam listados
+      const used = new Set(states.filter(x => x.sub).map(x => x.sub.id));
+      subsFor(f.id).filter(s => isToday(s.ts) && !used.has(s.id)).forEach(s => done.push({ f, slot: s.slot, label: null, sub: s }));
     } else {
       const sub = todaySubFor(f.id);
       if (sub) done.push({ f, slot: null, sub }); else if (activeToday(f)) todo.push({ f, slot: null, st: 'afazer', min: Infinity });
@@ -29,8 +33,8 @@ export function renderOpPac() {
   });
   // ordem: início do expediente no topo (é o que se faz primeiro no dia), depois os
   // atrasados, depois por horário. Planilhas sem horário (fim do expediente, demanda) vão pro fim.
-  const isInicio = f => !!(f.schedule && f.schedule.type === 'momentos' && (f.schedule.moments || []).includes('inicio'));
-  const rank = t => isInicio(t.f) ? 0 : t.st === 'atrasado' ? 1 : 2;
+  const isInicio = t => !!(t.label && t.label.includes('Início'));
+  const rank = t => isInicio(t) ? 0 : t.st === 'atrasado' ? 1 : 2;
   todo.sort((a, b) => rank(a) - rank(b) || a.min - b.min);
   done.sort((a, b) => new Date(b.sub.ts) - new Date(a.sub.ts));
 
@@ -39,13 +43,13 @@ export function renderOpPac() {
     const { f } = t; const pac = getPac(f.pacId);
     if (t.sub) return pcard({
       icon: pac.icon, occ: !!t.sub.occurrence, title: f.title,
-      meta: `<span class="truncate">${t.slot ? `Horário ${t.slot} · ` : ''}Enviado às ${fmtTime(t.sub.ts)}</span>`,
+      meta: `<span class="truncate">${t.label ? `${esc(t.label)} · ` : t.slot ? `Horário ${t.slot} · ` : ''}Enviado às ${fmtTime(t.sub.ts)}</span>`,
       trailing: icon('chevron_right', 'text-on-surface-variant flex-none'),
       open: `data-action="open-sub" data-sub="${t.sub.id}"`,
     });
     return pcard({
       icon: pac.icon, occ: false, title: f.title,
-      meta: `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${!t.slot ? esc(dueText(f)) : usesWindow(f.schedule) ? `${t.slot} · ${esc(freq(f))}` : `às ${t.slot}`}</span>`,
+      meta: `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${!t.slot ? esc(dueText(f)) : t.label ? `${esc(t.label)} · ${t.slot}` : usesWindow(f.schedule) ? `${t.slot} · ${esc(freq(f))}` : `às ${t.slot}`}</span>`,
       trailing: t.st === 'atrasado'
         ? `<span class="mono text-[10px] font-bold uppercase px-2 py-1 rounded ${STATUS_META.atrasado.bg} ${STATUS_META.atrasado.tx} flex-none">${STATUS_META.atrasado.label}</span>`
         : `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">No Prazo</span>`,
@@ -89,6 +93,7 @@ export function renderPreencher() {
     params.slot = open[0].slot;
   }
   window.__fillSlot = hasSlots ? params.slot : null;
+  const fillLabel = hasSlots ? ((slotStates(f).find(x => x.slot === params.slot) || {}).label) : null;
 
   window.__fill = {};
   f.params.forEach(p => { window.__fill[p.id] = null; });
@@ -179,7 +184,7 @@ export function renderPreencher() {
         <span class="mono text-[10px] text-on-surface-variant">${plCode(f)}</span>
       </div>
       <h1 class="text-[24px] font-bold text-on-surface leading-tight">${esc(f.title)}</h1>
-      ${window.__fillSlot ? `<div class="flex items-center gap-1.5 mt-1 text-[12px] text-on-surface-variant">${icon('schedule', 'text-[15px]')} Registro das ${window.__fillSlot}</div>` : ''}
+      ${window.__fillSlot ? `<div class="flex items-center gap-1.5 mt-1 text-[12px] text-on-surface-variant">${icon('schedule', 'text-[15px]')} ${fillLabel ? `${esc(fillLabel)} (${window.__fillSlot})` : `Registro das ${window.__fillSlot}`}</div>` : ''}
     </div>
     <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-4 flex gap-3">
       ${icon('location_on', 'text-secondary flex-none', true)}

@@ -41,6 +41,7 @@ export function unidadeOut(u) {
   return {
     razaoSocial: u.razao_social, marca: u.marca, cnpj: u.cnpj, sif: u.sif,
     endereco: u.endereco, municipio: u.municipio, rtNome: u.rt_nome, rtRegistro: u.rt_registro, logo: u.logo,
+    turnos: u.turnos_json ? JSON.parse(u.turnos_json) : null,
   };
 }
 

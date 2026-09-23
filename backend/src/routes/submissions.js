@@ -31,7 +31,9 @@ submissionsRouter.post('/', authenticate, requireRole('operador'), (req, res) =>
 
   // planilha com horários (ex.: a cada 2h): cada envio cumpre um horário específico,
   // que precisa existir e ainda não ter sido registrado hoje.
-  const slots = daySlots(JSON.parse(form.schedule_json || 'null'), JSON.parse(form.times_json || '[]'), form.due);
+  const uni = db.prepare('SELECT turnos_json FROM unidade WHERE id = ?').get(req.user.unidade_id);
+  const turnos = uni && uni.turnos_json ? JSON.parse(uni.turnos_json) : null;
+  const slots = daySlots(JSON.parse(form.schedule_json || 'null'), JSON.parse(form.times_json || '[]'), form.due, turnos);
   let slot = null;
   if (slots.length) {
     slot = String(req.body.slot || '');

@@ -1,7 +1,8 @@
 import { $, esc, icon, toast } from '../helpers.js';
 import { currentUser, getUnidade } from '../state.js';
 import * as api from '../api.js';
-import { closeModal } from '../router.js';
+import { closeModal, rerender } from '../router.js';
+import { DEFAULT_TURNOS } from '../schedule.js';
 
 export function profileMenu(triggerEl) {
   const mr = $('modal-root');
@@ -62,8 +63,22 @@ export async function saveNewPassword() {
   } catch (e) { err.textContent = e.message || 'Não foi possível alterar a senha.'; err.classList.remove('hidden'); }
 }
 
+function turnoRow(i, t, fixed) {
+  const inp = (id, v) => `<input id="${id}" type="time" step="300" value="${esc(v)}" class="bg-surface-container-low rounded-lg px-2 py-2 mono text-[14px] text-on-surface border border-transparent focus:border-primary">`;
+  const on = fixed || t.ativo !== false;
+  // nome do turno numa linha, horários na de baixo — igual nos dois turnos, pra alinhar no celular
+  return `<div class="${i ? 'mt-3' : ''}">
+    <div class="flex items-center gap-2 h-[26px]">
+      <span class="text-[13px] font-semibold text-on-surface">${i + 1}º turno</span>
+      ${fixed ? '' : `<span id="uni-t${i}-on" class="toggle ${on ? 'on' : ''} flex-none cursor-pointer ml-auto"></span>`}
+    </div>
+    <div id="uni-t${i}-times" class="flex items-center gap-2 mt-1 ${on ? '' : 'opacity-40 pointer-events-none'}">${inp(`uni-t${i}-ini`, t.inicio)}<span class="text-[12px] text-on-surface-variant">às</span>${inp(`uni-t${i}-fim`, t.fim)}</div>
+  </div>`;
+}
+
 export function unidadeSheet() {
   const u = getUnidade(); window.__uniLogo = u.logo || null;
+  const turnos = [0, 1].map(i => ({ ...DEFAULT_TURNOS[i], ...((u.turnos || [])[i] || {}) }));
   const fld = (id, label, val, ph) => `<div><label class="mono text-[10px] uppercase text-on-surface-variant">${label}</label><input id="${id}" value="${esc(val || '')}" placeholder="${esc(ph || '')}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] text-on-surface placeholder:text-outline-variant border border-transparent focus:border-primary"></div>`;
   $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-center justify-center p-4" data-close-modal>
     <div class="absolute inset-0 bg-black/40" data-close-modal></div>
@@ -85,6 +100,12 @@ export function unidadeSheet() {
         ${fld('uni-mun', 'Município/UF', u.municipio)}
         <div class="grid grid-cols-2 gap-2">${fld('uni-rt', 'Responsável Técnico', u.rtNome)}${fld('uni-rtreg', 'Registro (CRMV)', u.rtRegistro)}</div>
       </div>
+      <div class="mt-5 pt-4 border-t border-outline-variant/40">
+        <div class="font-semibold text-on-surface text-[14px]">Expediente</div>
+        <div class="text-[11px] text-on-surface-variant mb-3">Define "início/fim do turno" e o horário padrão das planilhas "a cada X horas".</div>
+        ${turnoRow(0, turnos[0], true)}
+        ${turnoRow(1, turnos[1], false)}
+      </div>
       <button data-action="save-unidade" class="tap w-full mt-4 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px]">Salvar dados da unidade</button>
     </div></div>`;
   const li = $('uni-logo'); if (li) li.onchange = () => {
@@ -94,6 +115,10 @@ export function unidadeSheet() {
     r.onload = () => { window.__uniLogo = r.result; const pv = $('uni-logo-prev'); if (pv) pv.innerHTML = `<img src="${r.result}" class="w-full h-full object-contain">`; };
     r.readAsDataURL(f);
   };
+  const tg = $('uni-t1-on'); if (tg) tg.onclick = () => {
+    tg.classList.toggle('on'); const on = tg.classList.contains('on');
+    $('uni-t1-times').classList.toggle('opacity-40', !on); $('uni-t1-times').classList.toggle('pointer-events-none', !on);
+  };
 }
 
 export async function saveUnidade() {
@@ -101,7 +126,11 @@ export async function saveUnidade() {
     razaoSocial: $('uni-razao').value.trim(), cnpj: $('uni-cnpj').value.trim(), sif: $('uni-sif').value.trim(),
     marca: $('uni-marca').value.trim(), endereco: $('uni-end').value.trim(), municipio: $('uni-mun').value.trim(),
     rtNome: $('uni-rt').value.trim(), rtRegistro: $('uni-rtreg').value.trim(), logo: window.__uniLogo || null,
+    turnos: [
+      { inicio: $('uni-t0-ini').value, fim: $('uni-t0-fim').value, ativo: true },
+      { inicio: $('uni-t1-ini').value, fim: $('uni-t1-fim').value, ativo: $('uni-t1-on').classList.contains('on') },
+    ],
   };
-  try { await api.saveUnidade(payload); await api.refreshState(); closeModal(); toast('Dados da unidade salvos.'); }
+  try { await api.saveUnidade(payload); await api.refreshState(); closeModal(); rerender(); toast('Dados da unidade salvos.'); }
   catch (e) { toast(e.message || 'Não foi possível salvar.', 'err'); }
 }

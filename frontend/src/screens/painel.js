@@ -24,7 +24,7 @@ function whenLabel(f) {
   const states = slotStates(f);
   if (states.length > 1) {
     const open = openSlots(f), feitos = states.filter(x => x.sub).length;
-    return `${open.length ? open[0].slot + ' · ' : ''}${feitos} de ${states.length} hoje`;
+    return `${open.length ? (open[0].label || open[0].slot) + ' · ' : ''}${feitos} de ${states.length} hoje`;
   }
   return dueText(f).split(' · ')[0];
 }
