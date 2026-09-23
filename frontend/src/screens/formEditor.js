@@ -112,7 +112,6 @@ export function renderWhen() {
         <span class="text-[13px] text-on-surface">Sem horário específico</span>
       </div>
       ${w.noTime ? `<p class="text-[11px] text-on-surface-variant mt-2">1 registro por dia, a qualquer hora — não fica atrasada.</p>` : `<div id="ed-times" class="flex flex-wrap gap-2 mt-3"></div>
-      <button data-action="add-time" class="tap mt-2 inline-flex items-center gap-1 text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} Adicionar horário</button>
       ${toleranceBlock(w)}`}`;
   } else if (w.type === 'intervalo') {
     body = `<div class="flex items-center gap-2">
@@ -237,7 +236,8 @@ function timeSelect(kind, val, i) {
 
 export function renderEditorTimes() {
   const wrap = $('ed-times'); if (!wrap) return;
-  if (!window.__editorTimes.length) { wrap.innerHTML = `<span class="text-[12px] text-on-surface-variant py-1">Nenhum horário definido.</span>`; return; }
+  // "adicionar" é uma caixinha do mesmo formato dos horários, logo depois do último
+  const addChip = `<button data-action="add-time" class="tap inline-flex items-center gap-1 bg-surface-container-low rounded-lg px-3 py-1.5 border border-dashed border-outline-variant text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} ${window.__editorTimes.length ? 'Horário' : 'Adicionar horário'}</button>`;
   wrap.innerHTML = window.__editorTimes.map((t, i) => {
     const parts = (t || '').split(':'); const hv = parts[0] !== undefined && parts[0] !== '' ? parseInt(parts[0], 10) : ''; const mv = parts[1] !== undefined && parts[1] !== '' ? parseInt(parts[1], 10) : '';
     return `<span class="inline-flex items-center gap-0.5 bg-surface-container-low rounded-lg pl-2 pr-1 py-1.5 border border-transparent focus-within:border-primary">
@@ -245,7 +245,7 @@ export function renderEditorTimes() {
       ${timeSelect('h', hv, i)}<span class="mono text-[15px] font-semibold text-on-surface-variant">:</span>${timeSelect('m', mv, i)}
       <button data-action="del-time" data-idx="${i}" class="tap w-6 h-6 rounded flex items-center justify-center text-on-surface-variant">${icon('close', 'text-[16px]')}</button>
     </span>`;
-  }).join('');
+  }).join('') + addChip;
 }
 
 export function syncEditorTimes() {
