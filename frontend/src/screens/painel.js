@@ -1,9 +1,10 @@
 import { $, esc, icon, fmtTime, isToday, toast } from '../helpers.js';
-import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, ownerName, dueText, slotStates, openSlots, isCada, formSlots, dayProgress } from '../state.js';
+import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, ownerName, dueText, openSlots, isCada, formSlots, dayProgress } from '../state.js';
 import { shell, profileTrigger, pcard, secHead } from '../ui.js';
 import { GE_NAV, STATUS_META } from '../config.js';
 import * as api from '../api.js';
 import { rerender } from '../router.js';
+import { toMin } from '../schedule.js';
 
 const app = () => $('app');
 
@@ -13,34 +14,32 @@ function computeStats() {
   const toSign = today.filter(s => !s.signedBy);
   const signed = today.filter(s => s.signedBy && !s.occurrence);
   const dueMin = f => { const m = dueMinutesToday(f); return m === null ? Infinity : m; };
-  const awaiting = DB.forms.filter(f => { const st = formStatus(f); return ['atrasado', 'pendente', 'afazer'].includes(st) && formActive(f) && pacActive(getPac(f.pacId)); })
-    .sort((a, b) => (formStatus(a) === 'atrasado' ? 0 : 1) - (formStatus(b) === 'atrasado' ? 0 : 1) || dueMin(a) - dueMin(b));
+  // linhas de "aguardando preenchimento": uma por horário em aberto (atrasados + o próximo,
+  // ex.: "Temperatura · 08:00", "· 10:00"); em "cada pessoa", uma por pessoa que ainda
+  // falta em cada um desses horários (ex.: "Uniforme · Clara"). Sem horários, uma por planilha.
+  const awaiting = [];
+  DB.forms.filter(f => formActive(f) && pacActive(getPac(f.pacId))).forEach(f => {
+    const st = formStatus(f);
+    if (!['atrasado', 'pendente', 'afazer'].includes(st)) return;
+    if (isCada(f)) {
+      const before = awaiting.length;
+      if (formSlots(f).length) openSlots(f).forEach(x => x.faltam.forEach(t => awaiting.push({ f, st: x.status, min: toMin(x.slot), when: x.label || x.slot, who: t.name })));
+      else dayProgress(f).faltam.forEach(t => awaiting.push({ f, st: 'afazer', min: Infinity, when: dueText(f).split(' · ')[0], who: t.name }));
+      if (awaiting.length > before) return;
+      // ninguém designado/do turno: cai na linha única de sempre
+    }
+    if (formSlots(f).length) {
+      const open = openSlots(f);
+      if (open.length) { open.forEach(x => awaiting.push({ f, st: x.status, min: toMin(x.slot), when: x.label || x.slot, who: ownerName(f) })); return; }
+    }
+    awaiting.push({ f, st, min: dueMin(f), when: whenLabel(f), who: ownerName(f) });
+  });
+  awaiting.sort((a, b) => (a.st === 'atrasado' ? 0 : 1) - (b.st === 'atrasado' ? 0 : 1) || a.min - b.min || a.f.title.localeCompare(b.f.title));
   return { nc, toSign, signed, awaiting };
 }
 
-// planilha com vários horários: próximo horário em aberto + progresso do dia
-// (ex.: "10:00 · 2 de 7 hoje"); sem horários, a descrição da frequência.
-function whenLabel(f) {
-  const states = slotStates(f);
-  // "cada pessoa": o progresso que importa é o de pessoas (whoLabel), não o de horários
-  if (isCada(f) && states.length) { const open = openSlots(f); return open.length ? (open[0].label || open[0].slot) : dueText(f).split(' · ')[0]; }
-  if (states.length > 1) {
-    const open = openSlots(f), feitos = states.filter(x => x.sub).length;
-    return `${open.length ? (open[0].label || open[0].slot) + ' · ' : ''}${feitos} de ${states.length} hoje`;
-  }
-  return dueText(f).split(' · ')[0];
-}
-
-// quem: em "basta um", os responsáveis; em "cada pessoa", o progresso do horário em
-// aberto (ou do dia) e quem ainda falta — é isso que o gestor precisa cobrar.
-function whoLabel(f) {
-  if (!isCada(f)) return ownerName(f);
-  const open = openSlots(f);
-  const prog = formSlots(f).length ? open[0] : dayProgress(f);
-  if (!prog || !prog.total) return ownerName(f);
-  const nomes = prog.faltam.map(t => t.name.split(' ')[0]);
-  return `${prog.feitos} de ${prog.total} enviaram${nomes.length ? ` · falta: ${nomes.join(', ')}` : ''}`;
-}
+// planilha sem horários (as com horário viram uma linha por horário): a frequência
+const whenLabel = f => dueText(f).split(' · ')[0];
 
 export function renderPainel() {
   const { nc, toSign, signed, awaiting } = computeStats();
@@ -69,11 +68,10 @@ export function renderPainel() {
     });
   }).join('');
 
-  const awaitRows = awaiting.map(f => {
-    const st = formStatus(f);
+  const awaitRows = awaiting.map(({ f, st, when, who }) => {
     return pcard({
       icon: getPac(f.pacId).icon, occ: false, title: f.title,
-      meta: `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(whenLabel(f))} · ${esc(whoLabel(f))}</span>`,
+      meta: `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(when)} · ${esc(who)}</span>`,
       trailing: st === 'atrasado'
         ? `<span class="mono text-[10px] font-bold uppercase px-2 py-1 rounded ${STATUS_META.atrasado.bg} ${STATUS_META.atrasado.tx} flex-none">${STATUS_META.atrasado.label}</span>`
         : `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">No Prazo</span>`,
