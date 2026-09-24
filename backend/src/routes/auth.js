@@ -37,13 +37,34 @@ authRouter.post('/signup', (req, res) => {
   res.status(201).json({ token, user: publicUser(user) });
 });
 
+// contra força bruta: no máximo LOGIN_MAX tentativas erradas por (IP + login) a cada
+// LOGIN_WINDOW_MS. Em memória — zera se o servidor reiniciar, o que é aceitável aqui.
+const LOGIN_MAX = 10, LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const failedLogins = new Map(); // chave → { count, since }
+function loginBlocked(key) {
+  const f = failedLogins.get(key);
+  if (!f) return false;
+  if (Date.now() - f.since > LOGIN_WINDOW_MS) { failedLogins.delete(key); return false; }
+  return f.count >= LOGIN_MAX;
+}
+function loginFailed(key) {
+  const f = failedLogins.get(key);
+  if (!f || Date.now() - f.since > LOGIN_WINDOW_MS) failedLogins.set(key, { count: 1, since: Date.now() });
+  else f.count++;
+}
+
 authRouter.post('/login', (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Informe usuário e senha.' });
-  const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(String(username).toLowerCase().trim());
+  const uname = String(username).toLowerCase().trim();
+  const key = `${req.ip}|${uname}`;
+  if (loginBlocked(key)) return res.status(429).json({ error: 'Muitas tentativas. Aguarde 15 minutos e tente de novo.' });
+  const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(uname);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    loginFailed(key);
     return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
   }
+  failedLogins.delete(key);
   db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(new Date().toISOString(), user.id);
   const token = signToken(user);
   res.json({ token, user: publicUser(user) });

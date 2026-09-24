@@ -71,7 +71,7 @@ npm start          # http://localhost:8787 — serve a API e o frontend juntos
 O backend já serve os arquivos de `frontend/` na raiz (`/`), então não é
 preciso subir os dois separadamente nem configurar CORS para uso normal.
 Na primeira execução ele cria `backend/data/meupac.sqlite` e semeia os dados
-de exemplo abaixo.
+de exemplo abaixo (só fora de produção — veja "Publicar no Render").
 
 Variáveis de ambiente (opcionais, ver `backend/.env.example`):
 
@@ -82,6 +82,31 @@ Variáveis de ambiente (opcionais, ver `backend/.env.example`):
   mundo precisa logar de novo quando o servidor reinicia.
 - `MEUPAC_DB` — caminho do arquivo SQLite (padrão `backend/data/meupac.sqlite`).
   Útil pra rodar uma instância de teste sem tocar nos dados reais.
+- `TZ` — fuso horário do servidor (ex.: `America/Sao_Paulo`). Define o que é
+  "hoje" e quando um horário fica atrasado; em servidores na nuvem o padrão é UTC.
+- `MEUPAC_SEED_DEMO=1` — cria os usuários de exemplo mesmo em produção (não use
+  num servidor público: as senhas são conhecidas).
+
+## Publicar no Render
+
+O repositório tem um `render.yaml` (Blueprint) com tudo configurado: Node 24,
+`NODE_ENV=production`, fuso de São Paulo, `JWT_SECRET` gerado pelo Render e o
+banco num **disco persistente** em `/var/data`.
+
+1. Crie uma conta em [render.com](https://render.com) e conecte o GitHub.
+2. **New → Blueprint**, escolha este repositório e confirme. O Render lê o
+   `render.yaml` e cria o serviço `meupac` com o disco.
+3. Espere o deploy terminar e abra a URL (`https://meupac-xxxx.onrender.com`).
+4. Em `/app`, use **Criar conta** para cadastrar a sua unidade — em produção
+   não existem usuários de exemplo.
+
+Observações:
+- O disco persistente exige um plano pago (Starter). No plano gratuito o banco
+  seria apagado a cada deploy/reinício — inaceitável para uma trilha de auditoria.
+- O Render faz snapshot diário do disco; para mais segurança, baixe cópias
+  periódicas do arquivo `meupac.sqlite` (Shell do serviço).
+- Cada `git push` na `main` gera um novo deploy automaticamente.
+- Domínio próprio: Settings → Custom Domains no serviço.
 
 ## Login (dados de exemplo)
 
@@ -118,11 +143,13 @@ define login, senha e (para operadores) o turno, e passa os dados à pessoa.
 
 ## Próximos passos de hardening (antes de produção "de verdade")
 
-- HTTPS na frente do servidor (reverse proxy) e `JWT_SECRET` forte e secreto.
+- HTTPS e `JWT_SECRET` forte: no Render, já vêm prontos (HTTPS automático e
+  segredo gerado).
 - Backup periódico de `backend/data/meupac.sqlite` (ou migrar para um banco
   gerenciado, se o volume justificar).
 - Política de senha (tamanho mínimo, expiração) e 2FA para contas de
   gestor/RT.
-- Rate limiting no `/api/auth/login` contra força bruta.
+- Limite de tentativas no login: feito (10 erros por login+IP a cada 15 min,
+  em memória). Com mais de uma instância, mover para um armazenamento comum.
 - Migrar `bcryptjs`/`node:sqlite` (ainda experimental no Node) para versões
   estáveis conforme o ecossistema evoluir.

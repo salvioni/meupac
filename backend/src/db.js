@@ -297,7 +297,9 @@ function seedIfEmpty() {
   addSub('s4', 'f_cam', 'u_carlos', 'Carlos Mendes', isoAt(0, 10, 30), { p_c1: { ok: true, val: '2.1 °C', num: 2.1 }, p_c3: { ok: false, val: '4.8 °C', num: 4.8 } }, false, { issues: ['Câmara 03: 4.8 °C (faixa -1–4)'], note: 'Portas seladas, carcaças sob quarentena.' }, '', null, null);
 }
 
-seedIfEmpty();
+// dados de demonstração (usuários com senha conhecida!) só fora de produção, ou se
+// pedido explicitamente — num servidor público, qualquer um entraria com eles
+if (process.env.NODE_ENV !== 'production' || process.env.MEUPAC_SEED_DEMO === '1') seedIfEmpty();
 migrateFormOperators();
 clearStaleDue();
 backfillPacDescriptions();

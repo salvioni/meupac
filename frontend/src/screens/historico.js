@@ -127,7 +127,8 @@ function bindHist(subs, showAssinar) {
 
 /* ===== Exportar (PDF/CSV) ===== */
 export function exportSheet() {
-  const fmtISO = d => d.toISOString().slice(0, 10);
+  // data local (AAAA-MM-DD) — toISOString daria o dia em UTC, que no Brasil vira às 21h
+  const fmtISO = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return fmtISO(d); };
   const SPAN = { hoje: 0, '7': 7, '30': 30, '90': 90, tudo: null };
   const today = new Date(), d30 = new Date(); d30.setDate(d30.getDate() - 30);

@@ -1,0 +1,27 @@
+# Blueprint do Render (https://render.com/docs/blueprint-spec): um serviço web que
+# serve a API e o frontend juntos, com o banco SQLite num disco persistente.
+services:
+  - type: web
+    name: meupac
+    runtime: node
+    # disco persistente só existe nos planos pagos — sem ele o banco some a cada deploy
+    plan: starter
+    region: virginia # a mais perto do Brasil entre as do Render
+    buildCommand: cd backend && npm ci
+    startCommand: cd backend && node src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24" # node:sqlite sem flag precisa de Node >= 22.13
+      - key: NODE_ENV
+        value: production # exige JWT_SECRET e não cria os usuários de demonstração
+      - key: TZ
+        value: America/Sao_Paulo # "hoje", atrasos e horários no fuso da fábrica
+      - key: JWT_SECRET
+        generateValue: true # o Render gera um segredo forte e guarda
+      - key: MEUPAC_DB
+        value: /var/data/meupac.sqlite
+    disk:
+      name: meupac-data
+      mountPath: /var/data
+      sizeGB: 1

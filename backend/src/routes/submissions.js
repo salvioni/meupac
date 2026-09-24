@@ -130,8 +130,10 @@ submissionsRouter.post('/:id/sign', authenticate, requireRole('gerente'), (req, 
 });
 
 submissionsRouter.post('/sign-all', authenticate, requireRole('gerente'), (req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
-  const pending = db.prepare('SELECT id FROM submissions WHERE signed_by IS NULL AND substr(ts,1,10) = ? AND unidade_id = ?').all(today, req.user.unidade_id);
+  // "hoje" no fuso do servidor (TZ), igual ao resto do app — a data UTC do ISO vira o dia às 21h no Brasil
+  const today = new Date().toDateString();
+  const pending = db.prepare('SELECT id, ts FROM submissions WHERE signed_by IS NULL AND unidade_id = ?').all(req.user.unidade_id)
+    .filter(r => new Date(r.ts).toDateString() === today);
   const signed = pending.map(p => signOne(p.id, req.user.unidade_id, req.user)).filter(Boolean).map(submissionOut);
   res.json({ signed });
 });

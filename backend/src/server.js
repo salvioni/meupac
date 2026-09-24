@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import './db.js';
+import { db } from './db.js';
 
 import { authRouter } from './routes/auth.js';
 import { stateRouter } from './routes/state.js';
@@ -17,8 +17,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const frontendDir = join(__dirname, '..', '..', 'frontend');
 
 const app = express();
+// em produção roda atrás do proxy do Render: req.ip vem do X-Forwarded-For
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json({ limit: '3mb' }));
+
+// health check (Render): confirma que o servidor responde e o banco abre
+app.get('/api/health', (req, res) => {
+  try { db.prepare('SELECT 1').get(); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ ok: false }); }
+});
 
 app.use('/api/auth', authRouter);
 app.use('/api/state', stateRouter);
