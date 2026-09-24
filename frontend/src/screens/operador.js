@@ -65,7 +65,8 @@ export function renderOpPac() {
 
   const list = opFilter === 'afazer' ? todo : opFilter === 'concluidas' ? done : all;
   const body = !list.length
-    ? (opFilter === 'afazer' ? empty('task_alt', 'Tudo em dia!', 'Nenhuma planilha pendente no momento.') : empty('inbox', 'Nada por aqui', 'Nenhum registro nesta lista ainda.'))
+    ? (!myForms.length ? empty('assignment', 'Nenhuma planilha ainda', 'Seu gestor ainda não criou planilhas para você. Assim que criar, elas aparecem aqui.')
+      : opFilter === 'afazer' ? empty('task_alt', 'Tudo em dia!', 'Nenhuma planilha pendente no momento.') : empty('inbox', 'Nada por aqui', 'Nenhum registro nesta lista ainda.'))
     : `<div class="space-y-2">${list.map(row).join('')}</div>`;
 
   const inner = `<div class="px-4 py-5 space-y-4">

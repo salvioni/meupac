@@ -128,3 +128,7 @@ export async function saveTurnos(turnos) {
   const data = await request('/unidade/turnos', { method: 'PUT', body: { turnos } });
   return data.unidade;
 }
+
+export async function verifyAudit() {
+  return request('/audit/verify');
+}

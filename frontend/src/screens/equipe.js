@@ -1,5 +1,5 @@
 import { $, esc, icon, toast } from '../helpers.js';
-import { DB, currentUser, isTitular, getPac, pacActive, dueText, plCode, unitTurnos } from '../state.js';
+import { DB, currentUser, isTitular, getPac, pacActive, dueText, plCode, unitTurnos, visibleToOperator } from '../state.js';
 import { activeTurnos, DEFAULT_TURNOS } from '../schedule.js';
 
 // nome do turno de um operador (só faz sentido com 2 turnos ligados na unidade)
@@ -26,7 +26,7 @@ export async function renderEquipe() {
       <div class="relative flex-none"><span class="w-9 h-9 rounded-full flex items-center justify-center font-mono text-[11px] font-bold" style="background:${t.color || '#dfe9fb'};color:${t.ink || '#0f2642'}">${t.initials || '·'}</span></div>
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-on-surface text-[14px] truncate">${esc(t.name)}${isSelf ? ' (você)' : ''}</div>
-        ${isOp ? `<div class="flex items-center gap-1 text-[11px] text-on-surface-variant mt-0.5"><span class="truncate">${turnoName(t) ? `${turnoName(t)} · ` : ''}${t.ownedFormIds.length} planilha${t.ownedFormIds.length !== 1 ? 's' : ''} autorizada${t.ownedFormIds.length !== 1 ? 's' : ''}</span></div>` : ''}
+        ${isOp ? `<div class="flex items-center gap-1 text-[11px] text-on-surface-variant mt-0.5"><span class="truncate">${turnoName(t) ? `${turnoName(t)} · ` : ''}${accessText(t)}</span></div>` : ''}
       </div>
       <div class="flex items-center gap-2 flex-none">
         ${isTitular(t) ? `<span class="mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-primary text-on-primary">Admin</span>` : isOp ? `<span class="mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">Operador</span>` : `<span class="mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-inverse-primary text-primary">Gestor</span>`}
@@ -47,9 +47,15 @@ export async function renderEquipe() {
     ${turnosCard(team)}
     <p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant">Membros · ${team.length}</p>
     <div class="bg-surface-container-lowest rounded-xl overflow-hidden divide-y divide-outline-variant/40">${[...team].sort((a, b) => (isTitular(a) ? 0 : a.role === 'operador' ? 2 : 1) - (isTitular(b) ? 0 : b.role === 'operador' ? 2 : 1)).map(memberRow).join('')}</div>
-    <div class="bg-surface-container rounded-xl p-4 flex gap-2">${icon('shield', 'text-on-surface-variant flex-none', true)}<p class="text-[12px] text-on-surface-variant">Trilha de auditoria com cadeia de hashes: qualquer alteração retroativa de um registro assinado é detectável — conferível em Auditoria.</p></div>
+    <div class="bg-surface-container rounded-xl p-4 flex gap-2">${icon('shield', 'text-on-surface-variant flex-none', true)}<div class="flex-1"><p class="text-[12px] text-on-surface-variant">Trilha de auditoria com cadeia de hashes: qualquer alteração retroativa de um registro assinado é detectável.</p><button data-action="verify-audit" class="tap mt-2 text-[12px] font-semibold text-primary">Verificar agora</button></div></div>
   </div>`;
   app().innerHTML = shell(inner, GE_NAV, 'ge_equipe', profileTrigger());
+}
+
+// quantas planilhas a pessoa vê: as marcadas pra ela + as sem ninguém marcado (liberadas a todos)
+function accessText(t) {
+  const n = DB.forms.filter(f => visibleToOperator(f, t.id)).length;
+  return `vê ${n} planilha${n !== 1 ? 's' : ''}`;
 }
 
 const inputCls = 'w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary';
@@ -190,9 +196,9 @@ export function renderEditSheet() {
       <div class="flex gap-2">${roleBtn('operador', 'Operador', 'engineering')}${currentUser.titular ? roleBtn('gerente', 'Gestor', 'shield_person') : ''}</div>
       ${currentUser.titular ? '' : `<p class="mono text-[10px] text-on-surface-variant mt-1">Somente o titular pode promover alguém a gestor.</p>`}
       ${e.role === 'operador'
-        ? `<div class="mt-4 flex items-start gap-2 bg-surface-container rounded-lg p-3 text-on-surface-variant text-[12px]">${icon('engineering', 'text-primary text-[18px] flex-none', true)}<span>O operador preenche e assina digitalmente, no seu turno, apenas as planilhas autorizadas abaixo. Não acessa o painel de gestão, o histórico da fábrica nem assina planilhas de outros.</span></div>
+        ? `<div class="mt-4 flex items-start gap-2 bg-surface-container rounded-lg p-3 text-on-surface-variant text-[12px]">${icon('engineering', 'text-primary text-[18px] flex-none', true)}<span>O operador preenche e assina digitalmente as planilhas do seu turno. Planilha sem ninguém marcado fica liberada para todos os operadores; marque abaixo para restringir uma planilha a quem você escolher. Não acessa o painel de gestão, o histórico da fábrica nem assina planilhas de outros.</span></div>
            ${turnoSection}
-           <p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mt-4 mb-1">Planilhas Permitidas · <span id="owned-count">${e.owned.size}</span></p>${formsSection}`
+           <p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mt-4 mb-1">Restringir planilhas · <span id="owned-count">${e.owned.size}</span></p>${formsSection}`
         : `<div class="mt-4 flex items-start gap-2 bg-inverse-primary rounded-lg p-3 text-primary text-[12px]">${icon('verified_user', 'text-[18px] flex-none', true)}<span>O gestor valida e assina as planilhas, acompanha o painel e o histórico de toda a unidade e gerencia os operadores. Não preenche planilhas — isso é do operador.</span></div>`}
       <button data-action="save-member" class="tap w-full mt-4 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px]">Salvar acessos</button>
     </div></div>`;
@@ -351,4 +357,13 @@ export async function saveTurnos() {
   ];
   try { await api.saveTurnos(turnos); await api.refreshState(); closeModal(); rerender(); toast('Turnos salvos.'); }
   catch (e) { toast(e.message || 'Não foi possível salvar os turnos.', 'err'); }
+}
+
+// confere a cadeia de hashes inteira no servidor (routes/audit.js)
+export async function verifyAudit() {
+  try {
+    const r = await api.verifyAudit();
+    if (r.ok) toast(`Trilha íntegra: ${r.checked} registro${r.checked !== 1 ? 's' : ''} conferido${r.checked !== 1 ? 's' : ''}.`);
+    else toast(`Atenção: ${r.problems.length} registro${r.problems.length !== 1 ? 's' : ''} com hash que não confere.`, 'err');
+  } catch (e) { toast(e.message || 'Não foi possível verificar.', 'err'); }
 }

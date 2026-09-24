@@ -7,9 +7,10 @@ import { renderOpHist, renderGeHist, exportSheet, runExport } from './screens/hi
 import { renderPainel, sign, signAll } from './screens/painel.js';
 import { renderForms, renderPacForms, togglePacActive, toggleFormActive } from './screens/pacs.js';
 import { renderFormEditor, saveFormEditor, syncEditorParams, syncEditorTimes, renderEditorTimes, syncWhen, renderWhen, confirmDeleteForm, deleteFormConfirmed, openAddParam } from './screens/formEditor.js';
-import { renderEquipe, inviteSheet, confirmInvite, editMemberSheet, renderEditSheet, toggleFormAccess, saveMember, confirmResetPassword, resetMemberPassword, confirmDelete, deleteMember, turnosSheet, saveTurnos } from './screens/equipe.js';
+import { renderEquipe, inviteSheet, confirmInvite, editMemberSheet, renderEditSheet, toggleFormAccess, saveMember, confirmResetPassword, resetMemberPassword, confirmDelete, deleteMember, turnosSheet, saveTurnos, verifyAudit } from './screens/equipe.js';
 import { profileMenu, changePasswordSheet, saveNewPassword, unidadeSheet, saveUnidade } from './screens/perfil.js';
 import { toast } from './helpers.js';
+import { tourTick, startTour } from './tour.js';
 
 // a tela atual fica gravada na URL (?screen=...&...) pra sobreviver a um F5 —
 // sem isso, todo reload cai sempre no painel/lista padrão, perdendo onde a
@@ -61,6 +62,11 @@ export function logout() {
 }
 
 export function render() {
+  renderScreen();
+  tourTick(); // tutorial do gestor: destaca o próximo passo na tela que acabou de abrir
+}
+
+function renderScreen() {
   const frame = $('frame');
   if (!currentUser) { if (frame) frame.classList.add('web'); renderLogin(); return; }
   if (frame) frame.classList.remove('web');
@@ -137,6 +143,8 @@ export function initEventDelegation() {
       case 'del-member': confirmDelete(el.dataset.id); break;
       case 'del-confirm': deleteMember(el.dataset.id); break;
       case 'close-x': closeModal(); break;
+      case 'tour-start': startTour(); break;
+      case 'verify-audit': verifyAudit(); break;
     }
   });
 }

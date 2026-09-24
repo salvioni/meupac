@@ -94,6 +94,7 @@ export function renderPainel() {
 
   const inner = `<div class="px-4 py-5 space-y-5">
     <div><h1 class="text-[26px] font-bold text-on-surface leading-tight">Painel de Hoje</h1><p class="text-[13px] text-on-surface-variant">Conformidades, alertas e assinaturas do dia — atualizado em tempo real.</p></div>
+    ${firstSteps()}
     <div class="grid grid-cols-2 gap-3">
       ${stat('bg-nc-bg', 'text-nc-tx', nc.length, 'Não Conformes', 'warning')}
       ${stat('bg-inverse-primary', 'text-primary', toSign.length, 'A Assinar', 'draw')}
@@ -107,6 +108,28 @@ export function renderPainel() {
     <div class="h-1"></div>
   </div>`;
   app().innerHTML = shell(inner, GE_NAV, 'ge_painel', profileTrigger());
+}
+
+// unidade começando: o que falta pra ela funcionar, com o tutorial a um toque.
+// Some quando os três passos estão feitos.
+function firstSteps() {
+  const hasOp = (DB.team || []).some(t => t.role === 'operador' && t.active !== false);
+  const steps = [
+    ['Criar a primeira planilha', DB.forms.length > 0, 'Em PACs, abra um PAC e toque em Nova Planilha'],
+    ['Dar acesso a um operador', hasOp, 'Em Equipe, toque em Convidar'],
+    ['Receber o primeiro registro', DB.submissions.length > 0, 'O operador entra com o login dele e preenche'],
+  ];
+  if (steps.every(x => x[1])) return '';
+  const row = ([t, ok, hint]) => `<div class="flex items-start gap-3 py-2">
+      ${icon(ok ? 'check_circle' : 'radio_button_unchecked', (ok ? 'text-secondary' : 'text-outline-variant') + ' text-[22px] flex-none', ok)}
+      <div class="min-w-0"><div class="text-[14px] font-semibold ${ok ? 'text-on-surface-variant line-through' : 'text-on-surface'}">${t}</div>${ok ? '' : `<div class="text-[12px] text-on-surface-variant">${hint}</div>`}</div>
+    </div>`;
+  const canGuide = !DB.forms.length || !hasOp; // o tutorial cobre planilha e operador
+  return `<div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-4">
+    <div class="flex items-center gap-2 mb-1">${icon('rocket_launch', 'text-secondary text-[20px]', true)}<h2 class="font-semibold text-on-surface text-[15px]">Primeiros passos</h2></div>
+    <div class="divide-y divide-outline-variant/40">${steps.map(row).join('')}</div>
+    ${canGuide ? `<button data-action="tour-start" class="tap w-full mt-2 flex items-center justify-center gap-1.5 bg-secondary text-on-secondary rounded-lg py-2.5 font-semibold text-[13px]">${icon('play_circle', 'text-[18px]', true)} Me mostre como</button>` : ''}
+  </div>`;
 }
 
 export async function sign(id) {

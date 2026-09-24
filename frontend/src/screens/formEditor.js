@@ -166,6 +166,8 @@ export function renderWhen() {
   });
   const wc = document.querySelector('[data-win-custom]'); if (wc) wc.onclick = () => { syncWhen(); if (w.useExp) { const e = expediente(unitTurnos()); w.start = e.start; w.end = e.end; } w.useExp = false; renderWhen(); };
   ['ed-every', 'ed-count', 'ed-start', 'ed-end'].forEach(id => { const el = $(id); if (el) el.oninput = () => { syncWhen(); paintSlotPreview(); }; });
+  // no celular, tocar no campo e digitar "3" com o "2" já lá virava "23x ao dia"
+  ['ed-every', 'ed-count', 'ed-tolerance'].forEach(id => { const el = $(id); if (el) el.onfocus = () => el.select(); });
   paintSlotPreview();
 
   // dias: lista vazia = todos. Na tela, "todos" aparece com os 7 marcados; desmarcar um
