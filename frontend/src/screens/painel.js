@@ -1,5 +1,5 @@
 import { $, esc, icon, fmtTime, isToday, toast } from '../helpers.js';
-import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, ownerName, dueText, openSlots, isCada, formSlots, dayProgress } from '../state.js';
+import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, formOwners, slotVisibleTo, dueText, openSlots, isCada, formSlots, dayProgress } from '../state.js';
 import { shell, profileTrigger, pcard, secHead } from '../ui.js';
 import { GE_NAV, STATUS_META } from '../config.js';
 import * as api from '../api.js';
@@ -30,12 +30,23 @@ function computeStats() {
     }
     if (formSlots(f).length) {
       const open = openSlots(f);
-      if (open.length) { open.forEach(x => awaiting.push({ f, st: x.status, min: toMin(x.slot), when: x.label || x.slot, who: ownerName(f) })); return; }
+      if (open.length) { open.forEach(x => awaiting.push({ f, st: x.status, min: toMin(x.slot), when: x.label || x.slot, who: eitherName(f, x) })); return; }
     }
-    awaiting.push({ f, st, min: dueMin(f), when: whenLabel(f), who: ownerName(f) });
+    awaiting.push({ f, st, min: dueMin(f), when: whenLabel(f), who: eitherName(f) });
   });
   awaiting.sort((a, b) => (a.st === 'atrasado' ? 0 : 1) - (b.st === 'atrasado' ? 0 : 1) || a.min - b.min || a.f.title.localeCompare(b.f.title));
   return { nc, toSign, signed, awaiting };
+}
+
+// "basta um" com mais de uma pessoa: "João ou Mariana" (qualquer um deles faz, não os
+// dois). Com vários nomes, só o primeiro nome de cada, pra caber na linha.
+// slot: só quem é do turno daquele horário (o Carlos, do 2º turno, não faz o das 06:00)
+function eitherName(f, slot = null) {
+  const all = formOwners(f), turno = slot ? all.filter(u => slotVisibleTo(u)(slot)) : all;
+  const names = (turno.length ? turno : all).map(u => u.name);
+  if (names.length < 2) return names[0] || '—';
+  const first = names.map(n => n.split(' ')[0]);
+  return first.slice(0, -1).join(', ') + ' ou ' + first[first.length - 1];
 }
 
 // planilha sem horários (as com horário viram uma linha por horário): a frequência
