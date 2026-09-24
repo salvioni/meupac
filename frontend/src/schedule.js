@@ -39,16 +39,29 @@ export function expediente(turnos) {
   return { start: fromMin(Math.min(...act.map(t => toMin(t.inicio)))), end: fromMin(Math.max(...act.map(t => toMin(t.fim)))) };
 }
 
-// sem start/end salvos, a planilha segue o expediente da unidade
-function windowOf(schedule, turnos) {
-  const exp = expediente(turnos);
-  const start = toMin(schedule.start) ?? toMin(exp.start);
-  const end = toMin(schedule.end) ?? toMin(exp.end);
-  return end > start ? { start, end } : null;
+// "a cada X horas"/"N vezes ao dia" valem nos turnos escolhidos (schedule.turnos; sem
+// escolha = todos) ou num horário personalizado (schedule.start/end).
+export function isCustomWindow(schedule) { return !!(schedule && (schedule.start || schedule.end)); }
+function windowTurnos(schedule, turnos) {
+  const act = activeTurnos(turnos);
+  const chosen = Array.isArray(schedule.turnos) && schedule.turnos.length ? act.filter(t => schedule.turnos.includes(t.idx)) : act;
+  return chosen.length ? chosen : act;
+}
+// janelas em minutos: uma por turno escolhido (o intervalo recomeça no início de cada
+// turno) ou a personalizada
+function windowsOf(schedule, turnos) {
+  if (isCustomWindow(schedule)) {
+    const exp = expediente(turnos);
+    const start = toMin(schedule.start) ?? toMin(exp.start), end = toMin(schedule.end) ?? toMin(exp.end);
+    return end > start ? [{ start, end }] : [];
+  }
+  return windowTurnos(schedule, turnos).map(t => ({ start: toMin(t.inicio), end: toMin(t.fim), idx: t.idx }));
 }
 export function windowText(schedule, turnos) {
-  const w = windowOf(schedule, turnos);
-  return w ? `${fromMin(w.start)}–${fromMin(w.end)}` : '';
+  if (isCustomWindow(schedule)) { const w = windowsOf(schedule, turnos)[0]; return w ? `${fromMin(w.start)}–${fromMin(w.end)}` : ''; }
+  const act = activeTurnos(turnos), chosen = windowTurnos(schedule, turnos);
+  if (chosen.length === act.length) { const e = expediente(turnos); return `${e.start}–${e.end}`; }
+  return chosen.map(t => `${t.idx + 1}º turno`).join(' e ');
 }
 
 // true quando a frequência usa a janela início/fim (é o que o editor mostra)
@@ -86,11 +99,14 @@ function slotList(schedule, times, due, turnos) {
     const moments = (schedule.moments || []).filter(m => m === 'inicio' || m === 'fim');
     chosen.forEach(t => moments.forEach(m => out.push({ min: toMin(m === 'fim' ? t.fim : t.inicio), label: momentLabel(m, t, act.length), turno: t.idx })));
   } else if (usesWindow(schedule)) {
-    const win = windowOf(schedule, turnos); if (!win) return [];
+    const wins = windowsOf(schedule, turnos); if (!wins.length) return [];
     if (type === 'intervalo') {
       const step = Math.max(1, Number(schedule.every) || 1) * (schedule.unit === 'minutos' ? 1 : 60);
-      for (let t = win.start; t <= win.end && out.length < MAX_SLOTS; t += step) out.push({ min: t, label: null });
+      // cada horário pertence ao turno de onde veio (o 14:00 do "1º turno 06–14" é da manhã)
+      wins.forEach(win => { for (let t = win.start; t <= win.end && out.length < MAX_SLOTS; t += step) out.push(win.idx !== undefined ? { min: t, label: null, turno: win.idx } : { min: t, label: null }); });
     } else {
+      // N vezes: distribuídas do início do primeiro turno escolhido ao fim do último
+      const win = { start: Math.min(...wins.map(w => w.start)), end: Math.max(...wins.map(w => w.end)) };
       const n = Math.min(MAX_SLOTS, Math.max(1, Number(schedule.count) || 1));
       if (n === 1) out.push({ min: win.start, label: null });
       else for (let i = 0; i < n; i++) out.push({ min: win.start + Math.round(i * (win.end - win.start) / (n - 1)), label: null });

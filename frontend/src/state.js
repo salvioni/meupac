@@ -91,6 +91,11 @@ export function slotStates(f, who = null) {
   });
 }
 
+// todos os horários de hoje ainda sem envio (painel do gestor: o dia inteiro)
+export function pendingSlots(f) {
+  return activeToday(f) ? slotStates(f).filter(x => !x.sub) : [];
+}
+
 // o que o operador precisa fazer agora: os horários atrasados + o próximo a vencer.
 // keep filtra os horários (ex.: só os do turno da pessoa) antes de escolher o próximo.
 export function openSlots(f, keep = () => true, who = null) {

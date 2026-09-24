@@ -16,9 +16,10 @@ export function renderFormEditor() {
   const exp = expediente(unitTurnos());
   const es = (editing && editing.schedule) || {};
   const turnoIdx = activeTurnos(unitTurnos()).slice(0, 1).map(t => t.idx); // padrão: só o 1º turno
+  const allTurnoIdx = activeTurnos(unitTurnos()).map(t => t.idx);
   window.__when = editing && editing.schedule
-    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), noTime: !!es.semHorario || (es.type === 'fixos' && !(es.times && es.times.length) && !(editing.times && editing.times.length) && !editing.due), start: es.start || exp.start, end: es.end || exp.end, useExp: !(es.start || es.end), turnos: new Set(es.turnos && es.turnos.length ? es.turnos : turnoIdx), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
-    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), noTime: false, start: exp.start, end: exp.end, useExp: true, turnos: new Set(turnoIdx), days: [], toleranceMin: 0 };
+    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), noTime: !!es.semHorario || (es.type === 'fixos' && !(es.times && es.times.length) && !(editing.times && editing.times.length) && !editing.due), start: es.start || exp.start, end: es.end || exp.end, useExp: !(es.start || es.end), winTurnos: new Set(['intervalo', 'vezes'].includes(es.type) && es.turnos && es.turnos.length ? es.turnos : allTurnoIdx), turnos: new Set(es.turnos && es.turnos.length ? es.turnos : turnoIdx), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
+    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), noTime: false, start: exp.start, end: exp.end, useExp: true, winTurnos: new Set(allTurnoIdx), turnos: new Set(turnoIdx), days: [], toleranceMin: 0 };
 
   const inner = `<div class="px-4 py-4 space-y-4 pb-8">
     <div class="flex items-center justify-between">
@@ -156,7 +157,14 @@ export function renderWhen() {
     if (w.turnos.has(i)) { if (w.turnos.size > 1) w.turnos.delete(i); } else w.turnos.add(i);
     renderWhen();
   });
-  const ue = $('ed-useexp'); if (ue) ue.onclick = () => { syncWhen(); w.useExp = !w.useExp; if (w.useExp) { const e = expediente(unitTurnos()); w.start = e.start; w.end = e.end; } renderWhen(); };
+  document.querySelectorAll('[data-win-turno]').forEach(b => b.onclick = () => {
+    syncWhen(); const i = +b.dataset.winTurno;
+    if (!w.useExp) { w.useExp = true; w.winTurnos = new Set([i]); }
+    else if (w.winTurnos.has(i)) { if (w.winTurnos.size > 1) w.winTurnos.delete(i); }
+    else w.winTurnos.add(i);
+    renderWhen();
+  });
+  const wc = document.querySelector('[data-win-custom]'); if (wc) wc.onclick = () => { syncWhen(); if (w.useExp) { const e = expediente(unitTurnos()); w.start = e.start; w.end = e.end; } w.useExp = false; renderWhen(); };
   ['ed-every', 'ed-count', 'ed-start', 'ed-end'].forEach(id => { const el = $(id); if (el) el.oninput = () => { syncWhen(); paintSlotPreview(); }; });
   paintSlotPreview();
 
@@ -194,11 +202,13 @@ export function syncWhen() {
 // a frequência em horários concretos, cada um com seu próprio registro.
 function windowBlock(w) {
   const inp = (id, v) => `<input id="${id}" type="time" step="300" value="${esc(v)}" class="bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface border border-transparent focus:border-primary">`;
-  const exp = expediente(unitTurnos());
-  return `<div class="flex items-center gap-3 mt-3">
-      <span id="ed-useexp" class="toggle ${w.useExp ? 'on' : ''} flex-none cursor-pointer"></span>
-      <span class="text-[13px] text-on-surface">Seguir o expediente <span class="mono text-on-surface-variant">(${exp.start}–${exp.end})</span></span>
-    </div>
+  const act = activeTurnos(unitTurnos()), exp = expediente(unitTurnos());
+  const chipCls = on => `tap flex-1 flex flex-col items-center py-2 rounded-lg text-[12px] font-semibold ${on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}`;
+  // em quais turnos (ou, com a unidade num turno só, o expediente) — ou um horário próprio
+  const turnoChips = act.length > 1
+    ? act.map(t => `<button data-win-turno="${t.idx}" class="${chipCls(w.useExp && w.winTurnos.has(t.idx))}">${t.idx + 1}º turno<span class="mono text-[10px] font-normal opacity-80">${t.inicio}–${t.fim}</span></button>`).join('')
+    : `<button data-win-turno="${act[0].idx}" class="${chipCls(w.useExp)}">Expediente<span class="mono text-[10px] font-normal opacity-80">${exp.start}–${exp.end}</span></button>`;
+  return `<div class="flex gap-2 mt-3">${turnoChips}<button data-win-custom class="${chipCls(!w.useExp)}">Personalizado<span class="mono text-[10px] font-normal opacity-80">${w.useExp ? 'outro horário' : `${esc(w.start)}–${esc(w.end)}`}</span></button></div>
     ${w.useExp ? '' : `<div class="flex items-center gap-2 mt-3 flex-wrap">
       <span class="text-[13px] text-on-surface">Das</span>${inp('ed-start', w.start)}
       <span class="text-[13px] text-on-surface">às</span>${inp('ed-end', w.end)}
@@ -207,7 +217,7 @@ function windowBlock(w) {
 
 // sem start/end = segue o expediente da unidade (muda junto se os turnos mudarem)
 function whenSchedule(w) {
-  const win = w.useExp ? {} : { start: w.start, end: w.end };
+  const win = w.useExp ? { turnos: [...w.winTurnos].sort() } : { start: w.start, end: w.end };
   if (w.type === 'intervalo') return { type: 'intervalo', every: w.every, unit: w.unit, ...win };
   if (w.type === 'vezes') return { type: 'vezes', count: w.count, period: w.period, ...win };
   if (w.type === 'momentos') return { type: 'momentos', moments: [...w.moments], turnos: [...w.turnos].sort() };

@@ -131,7 +131,8 @@ submissionsRouter.post('/:id/sign', authenticate, requireRole('gerente'), (req, 
 
 submissionsRouter.post('/sign-all', authenticate, requireRole('gerente'), (req, res) => {
   const today = new Date().toISOString().slice(0, 10);
-  const pending = db.prepare('SELECT id FROM submissions WHERE signed_by IS NULL AND substr(ts,1,10) = ? AND unidade_id = ?').all(today, req.user.unidade_id);
+  // não conformidades ficam de fora: o gestor assina uma a uma, depois de olhar
+  const pending = db.prepare('SELECT id FROM submissions WHERE signed_by IS NULL AND occurrence_json IS NULL AND substr(ts,1,10) = ? AND unidade_id = ?').all(today, req.user.unidade_id);
   const signed = pending.map(p => signOne(p.id, req.user.unidade_id, req.user)).filter(Boolean).map(submissionOut);
   res.json({ signed });
 });

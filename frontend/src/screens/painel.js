@@ -1,5 +1,5 @@
 import { $, esc, icon, fmtTime, isToday, toast } from '../helpers.js';
-import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, formOwners, slotVisibleTo, dueText, openSlots, isCada, formSlots, dayProgress } from '../state.js';
+import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, formOwners, slotVisibleTo, dueText, pendingSlots, isCada, formSlots, dayProgress } from '../state.js';
 import { shell, profileTrigger, pcard, secHead } from '../ui.js';
 import { GE_NAV, STATUS_META } from '../config.js';
 import * as api from '../api.js';
@@ -14,8 +14,8 @@ function computeStats() {
   const toSign = today.filter(s => !s.signedBy);
   const signed = today.filter(s => s.signedBy && !s.occurrence);
   const dueMin = f => { const m = dueMinutesToday(f); return m === null ? Infinity : m; };
-  // linhas de "aguardando preenchimento": uma por horário em aberto (atrasados + o próximo,
-  // ex.: "Temperatura · 08:00", "· 10:00"); em "cada pessoa", uma por pessoa que ainda
+  // linhas de "aguardando preenchimento": uma por horário ainda sem envio no dia inteiro
+  // (ex.: "Temperatura · 08:00", "· 10:00"…), atrasados em cima; em "cada pessoa", uma por pessoa que ainda
   // falta em cada um desses horários (ex.: "Uniforme · Clara"). Sem horários, uma por planilha.
   const awaiting = [];
   DB.forms.filter(f => formActive(f) && pacActive(getPac(f.pacId))).forEach(f => {
@@ -23,13 +23,13 @@ function computeStats() {
     if (!['atrasado', 'pendente', 'afazer'].includes(st)) return;
     if (isCada(f)) {
       const before = awaiting.length;
-      if (formSlots(f).length) openSlots(f).forEach(x => x.faltam.forEach(t => awaiting.push({ f, st: x.status, min: toMin(x.slot), when: x.label || x.slot, who: t.name })));
+      if (formSlots(f).length) pendingSlots(f).forEach(x => x.faltam.forEach(t => awaiting.push({ f, st: x.status, min: toMin(x.slot), when: x.label || x.slot, who: t.name })));
       else dayProgress(f).faltam.forEach(t => awaiting.push({ f, st: 'afazer', min: Infinity, when: dueText(f).split(' · ')[0], who: t.name }));
       if (awaiting.length > before) return;
       // ninguém designado/do turno: cai na linha única de sempre
     }
     if (formSlots(f).length) {
-      const open = openSlots(f);
+      const open = pendingSlots(f);
       if (open.length) { open.forEach(x => awaiting.push({ f, st: x.status, min: toMin(x.slot), when: x.label || x.slot, who: eitherName(f, x) })); return; }
     }
     awaiting.push({ f, st, min: dueMin(f), when: whenLabel(f), who: eitherName(f) });
@@ -54,27 +54,31 @@ const whenLabel = f => dueText(f).split(' · ')[0];
 
 export function renderPainel() {
   const { nc, toSign, signed, awaiting } = computeStats();
+  const toSignOk = toSign.filter(s => !s.occurrence); // não conformes assinam na própria seção
   const stat = (bg, tx, val, label, ic, valTx) => `<div class="${bg} rounded-xl p-3.5">
     <div class="flex items-center justify-between"><span class="mono text-[10px] uppercase tracking-wide ${tx} opacity-80">${label}</span>${icon(ic, tx + ' text-[18px]', true)}</div>
     <div class="text-[30px] font-bold ${valTx || tx} leading-none mt-1">${String(val).padStart(2, '0')}</div></div>`;
 
+  // a não conformidade aparece só aqui (com o Assinar), não também em "aguardando
+  // assinatura" — senão parece que são dois registros
+  const signBtn = s => `<button data-action="sign" data-sub="${s.id}" class="tap flex items-center gap-1.5 bg-primary text-on-primary text-[12px] font-semibold px-3 py-2 rounded-lg flex-none">${icon('draw', 'text-[16px]')} Assinar</button>`;
   const ncCards = nc.map(s => {
     const f = getForm(s.formId), pac = getPac(f.pacId);
     return pcard({
       icon: pac.icon, occ: true, title: f.title,
       meta: `<span class="truncate">${s.slot ? `Registro das ${s.slot} · ` : ''}${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`,
       extra: `<div class="text-[11px] text-nc-tx font-semibold truncate mt-0.5">${esc(s.occurrence.issues[0])}</div>`,
-      trailing: icon('chevron_right', 'text-on-surface-variant flex-none'),
+      trailing: s.signedBy ? `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">Assinado</span>` : signBtn(s),
       open: `data-action="open-sub" data-sub="${s.id}"`,
     });
   }).join('');
 
-  const signRows = toSign.map(s => {
+  const signRows = toSignOk.map(s => {
     const f = getForm(s.formId);
     return pcard({
       icon: getPac(f.pacId).icon, occ: s.occurrence, title: f.title,
       meta: `<span class="truncate">${s.slot ? `Registro das ${s.slot} · ` : ''}${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`,
-      trailing: `<button data-action="sign" data-sub="${s.id}" class="tap flex items-center gap-1.5 bg-primary text-on-primary text-[12px] font-semibold px-3 py-2 rounded-lg flex-none">${icon('draw', 'text-[16px]')} Assinar</button>`,
+      trailing: signBtn(s),
       open: `data-action="open-sub" data-sub="${s.id}"`,
     });
   }).join('');
@@ -98,9 +102,9 @@ export function renderPainel() {
       ${stat('bg-surface-container-high', 'text-primary', awaiting.length, 'A Preencher', 'pending_actions', 'text-on-surface-variant')}
     </div>
     ${nc.length ? `<div>${secHead('Não Conformidades', nc.length)}<div class="space-y-2">${ncCards}</div></div>` : ''}
-    ${toSign.length ? `<div>${secHead('Aguardando Assinatura', toSign.length)}
+    ${toSignOk.length ? `<div>${secHead('Aguardando Assinatura', toSignOk.length)}
       <div class="space-y-2">${signRows}</div>
-      ${toSign.length > 1 ? `<button data-action="sign-all" class="tap w-full mt-3 bg-primary text-on-primary rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 text-[14px]">${icon('done_all', '', true)} Assinar todos os ${toSign.length} registros</button>` : ''}</div>` : ''}
+      ${toSignOk.length > 1 ? `<button data-action="sign-all" class="tap w-full mt-3 bg-primary text-on-primary rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 text-[14px]">${icon('done_all', '', true)} Assinar todos os ${toSignOk.length} registros</button>` : ''}</div>` : ''}
     ${awaiting.length ? `<div>${secHead('Aguardando Preenchimento', awaiting.length)}<div class="space-y-2">${awaitRows}</div></div>` : ''}
     <div class="h-1"></div>
   </div>`;
