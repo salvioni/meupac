@@ -68,7 +68,7 @@ export function renderPainel() {
       icon: pac.icon, occ: true, title: f.title,
       meta: `<span class="truncate">${s.slot ? `Registro das ${s.slot} · ` : ''}${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`,
       extra: `<div class="text-[11px] text-nc-tx font-semibold truncate mt-0.5">${esc(s.occurrence.issues[0])}</div>`,
-      trailing: s.signedBy ? `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">Assinado</span>` : signBtn(s),
+      trailing: s.signedBy ? `<span class="flex items-center gap-1 text-[11px] font-semibold text-secondary flex-none">${icon('verified', 'text-[16px]', true)} Assinado</span>` : signBtn(s),
       open: `data-action="open-sub" data-sub="${s.id}"`,
     });
   }).join('');
@@ -83,15 +83,18 @@ export function renderPainel() {
     });
   }).join('');
 
-  const awaitRows = awaiting.map(({ f, st, when, who }) => {
-    return pcard({
-      icon: getPac(f.pacId).icon, occ: false, title: f.title,
-      meta: `${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(when)} · ${esc(who)}</span>`,
-      trailing: st === 'atrasado'
+  // aguardando preenchimento é só informativo (quem preenche é o operador): linhas num
+  // cartão único com divisórias, como a lista da Equipe — sem cara de botão
+  const awaitRows = awaiting.map(({ f, st, when, who }) => `<div class="flex items-center gap-3 px-3.5 py-3">
+      <span class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center flex-none">${icon(getPac(f.pacId).icon, 'text-primary text-[20px]', true)}</span>
+      <div class="flex-1 min-w-0">
+        <div class="font-medium text-on-surface text-[14px] truncate">${esc(f.title)}</div>
+        <div class="flex items-center gap-1 mt-0.5 min-w-0 text-[11px] text-on-surface-variant">${icon('schedule', 'text-[14px] flex-none')}<span class="truncate">${esc(when)} · ${esc(who)}</span></div>
+      </div>
+      ${st === 'atrasado'
         ? `<span class="mono text-[10px] font-bold uppercase px-2 py-1 rounded ${STATUS_META.atrasado.bg} ${STATUS_META.atrasado.tx} flex-none">${STATUS_META.atrasado.label}</span>`
-        : `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">No Prazo</span>`,
-    });
-  }).join('');
+        : `<span class="mono text-[10px] font-semibold uppercase px-2 py-1 rounded bg-surface-container text-on-surface-variant flex-none">No Prazo</span>`}
+    </div>`).join('');
 
   const inner = `<div class="px-4 py-5 space-y-5">
     <div><h1 class="text-[26px] font-bold text-on-surface leading-tight">Painel de Hoje</h1><p class="text-[13px] text-on-surface-variant">Conformidades, alertas e assinaturas do dia — atualizado em tempo real.</p></div>
@@ -105,7 +108,7 @@ export function renderPainel() {
     ${toSignOk.length ? `<div>${secHead('Aguardando Assinatura', toSignOk.length)}
       <div class="space-y-2">${signRows}</div>
       ${toSignOk.length > 1 ? `<button data-action="sign-all" class="tap w-full mt-3 bg-primary text-on-primary rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 text-[14px]">${icon('done_all', '', true)} Assinar todos os ${toSignOk.length} registros</button>` : ''}</div>` : ''}
-    ${awaiting.length ? `<div>${secHead('Aguardando Preenchimento', awaiting.length)}<div class="space-y-2">${awaitRows}</div></div>` : ''}
+    ${awaiting.length ? `<div>${secHead('Aguardando Preenchimento', awaiting.length)}<div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl overflow-hidden divide-y divide-outline-variant/40">${awaitRows}</div></div>` : ''}
     <div class="h-1"></div>
   </div>`;
   app().innerHTML = shell(inner, GE_NAV, 'ge_painel', profileTrigger());
