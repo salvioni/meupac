@@ -191,7 +191,7 @@ export function renderWhen() {
 
 export function syncWhen() {
   const w = window.__when;
-  if (w.type === 'fixos') { syncEditorTimes(); const t = $('ed-tolerance'); if (t) w.toleranceMin = Math.max(0, parseInt(t.value, 10) || 0); }
+  if (w.type === 'fixos') { const t = $('ed-tolerance'); if (t) w.toleranceMin = Math.max(0, parseInt(t.value, 10) || 0); }
   else if (w.type === 'intervalo') { const e = $('ed-every'), u = $('ed-unit'); if (e) w.every = Math.max(1, parseInt(e.value) || 1); if (u) w.unit = u.value; }
   else if (w.type === 'vezes') { const c = $('ed-count'), pd = $('ed-period'); if (c) w.count = Math.max(1, parseInt(c.value) || 1); if (pd) w.period = pd.value; }
   const st = $('ed-start'), en = $('ed-end'), tol = $('ed-tolerance');
@@ -241,34 +241,54 @@ function paintSlotPreview() {
   if (cnt) cnt.textContent = slots.length ? `${slots.length} por dia` : '';
 }
 
-function timeSelect(kind, val, i) {
-  const opts = kind === 'h' ? Array.from({ length: 24 }, (_, n) => n) : [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
-  return `<select data-t${kind}="${i}" class="ed-t${kind} appearance-none bg-transparent mono text-[15px] font-semibold text-on-surface text-center cursor-pointer focus:outline-none">
-    <option value="" ${val === '' ? 'selected' : ''}>--</option>
-    ${opts.map(n => `<option value="${n}" ${String(n) === String(val) ? 'selected' : ''}>${String(n).padStart(2, '0')}</option>`).join('')}
-  </select>`;
-}
-
+// horários fixos: cada um é um chip grande ("08:00 ×"); adicionar/editar abre uma folha
+// com grade de horas e de minutos — um toque em cada, fácil de acertar no celular
+// (antes eram dois <select> minúsculos lado a lado).
 export function renderEditorTimes() {
   const wrap = $('ed-times'); if (!wrap) return;
-  // "adicionar" é uma caixinha do mesmo formato dos horários, logo depois do último
-  const addChip = `<button data-action="add-time" class="tap inline-flex items-center gap-1 bg-surface-container-low rounded-lg px-3 py-1.5 border border-dashed border-outline-variant text-primary font-semibold text-[13px]">${icon('add', 'text-[18px]')} Adicionar horário</button>`;
-  wrap.innerHTML = window.__editorTimes.map((t, i) => {
-    const parts = (t || '').split(':'); const hv = parts[0] !== undefined && parts[0] !== '' ? parseInt(parts[0], 10) : ''; const mv = parts[1] !== undefined && parts[1] !== '' ? parseInt(parts[1], 10) : '';
-    return `<span class="inline-flex items-center gap-0.5 bg-surface-container-low rounded-lg pl-2 pr-1 py-1.5 border border-transparent focus-within:border-primary">
-      ${icon('schedule', 'text-on-surface-variant text-[16px]')}
-      ${timeSelect('h', hv, i)}<span class="mono text-[15px] font-semibold text-on-surface-variant">:</span>${timeSelect('m', mv, i)}
-      <button data-action="del-time" data-idx="${i}" class="tap w-6 h-6 rounded flex items-center justify-center text-on-surface-variant">${icon('close', 'text-[16px]')}</button>
-    </span>`;
-  }).join('') + addChip;
+  window.__editorTimes = [...new Set(window.__editorTimes.filter(Boolean))].sort();
+  const addChip = `<button data-action="add-time" class="tap inline-flex items-center gap-1.5 bg-surface-container-low rounded-lg px-3.5 h-11 border border-dashed border-outline-variant text-primary font-semibold text-[14px]">${icon('add', 'text-[20px]')} Adicionar horário</button>`;
+  wrap.innerHTML = window.__editorTimes.map((t, i) => `<span class="inline-flex items-center bg-surface-container-low rounded-lg h-11 overflow-hidden">
+      <button data-action="edit-time" data-idx="${i}" class="tap h-full flex items-center gap-1.5 pl-3 pr-1.5">${icon('schedule', 'text-on-surface-variant text-[18px]')}<span class="mono text-[16px] font-semibold text-on-surface">${esc(t)}</span></button>
+      <button data-action="del-time" data-idx="${i}" aria-label="Remover ${esc(t)}" class="tap h-full w-10 flex items-center justify-center text-on-surface-variant">${icon('close', 'text-[20px]')}</button>
+    </span>`).join('') + addChip;
 }
 
-export function syncEditorTimes() {
-  window.__editorTimes.forEach((_, i) => {
-    const hs = document.querySelector(`.ed-th[data-th="${i}"]`), ms = document.querySelector(`.ed-tm[data-tm="${i}"]`);
-    if (!hs || !ms) return;
-    window.__editorTimes[i] = (hs.value !== '' && ms.value !== '') ? String(hs.value).padStart(2, '0') + ':' + String(ms.value).padStart(2, '0') : '';
-  });
+// idx = -1 adiciona; senão edita o horário daquela posição
+export function openTimePicker(idx = -1) {
+  const cur = idx >= 0 ? window.__editorTimes[idx] : '';
+  const pick = { h: cur ? +cur.slice(0, 2) : null, m: cur ? +cur.slice(3, 5) : 0 };
+  const btnCls = on => `tap h-11 rounded-lg mono text-[15px] font-semibold ${on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface'}`;
+  const paint = () => {
+    const val = pick.h === null ? null : String(pick.h).padStart(2, '0') + ':' + String(pick.m).padStart(2, '0');
+    const dup = val && window.__editorTimes.some((t, i) => t === val && i !== idx);
+    $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-end sm:items-center justify-center" data-close-modal>
+    <div class="absolute inset-0 bg-black/40" data-close-modal></div>
+    <div class="relative bg-surface-container-lowest rounded-t-2xl sm:rounded-2xl w-full sm:max-w-[420px] max-h-[90dvh] overflow-y-auto scroll-area shadow-2xl p-4" style="padding-bottom:max(16px, env(safe-area-inset-bottom))">
+      <div class="flex items-center justify-between pb-3 border-b border-outline-variant/40">
+        <div class="font-semibold text-on-surface text-[16px]">${idx >= 0 ? 'Alterar horário' : 'Adicionar horário'}</div>
+        <div class="mono text-[22px] font-bold ${val ? 'text-primary' : 'text-outline-variant'}">${val || '--:--'}</div>
+      </div>
+      <p class="mono text-[10px] uppercase tracking-wide text-on-surface-variant mt-3 mb-2">Hora</p>
+      <div class="grid grid-cols-6 gap-1.5">${Array.from({ length: 24 }, (_, h) => `<button data-pick-h="${h}" class="${btnCls(pick.h === h)}">${String(h).padStart(2, '0')}</button>`).join('')}</div>
+      <p class="mono text-[10px] uppercase tracking-wide text-on-surface-variant mt-4 mb-2">Minuto</p>
+      <div class="grid grid-cols-6 gap-1.5">${Array.from({ length: 12 }, (_, k) => k * 5).map(m => `<button data-pick-m="${m}" class="${btnCls(pick.m === m)}">${String(m).padStart(2, '0')}</button>`).join('')}</div>
+      ${dup ? `<p class="text-[12px] text-error font-semibold mt-3">${val} já está na lista.</p>` : ''}
+      <div class="flex gap-2 mt-4">
+        <button data-action="close-x" class="tap flex-1 bg-surface-container text-on-surface rounded-xl py-3.5 font-semibold text-[14px]">Cancelar</button>
+        <button data-time-ok ${!val || dup ? 'disabled' : ''} class="tap flex-1 rounded-xl py-3.5 font-semibold text-[14px] ${!val || dup ? 'bg-surface-container text-outline-variant' : 'bg-primary text-on-primary'}">${val ? (idx >= 0 ? `Salvar ${val}` : `Adicionar ${val}`) : 'Escolha a hora'}</button>
+      </div>
+    </div></div>`;
+    document.querySelectorAll('[data-pick-h]').forEach(b => b.onclick = () => { pick.h = +b.dataset.pickH; paint(); });
+    document.querySelectorAll('[data-pick-m]').forEach(b => b.onclick = () => { pick.m = +b.dataset.pickM; paint(); });
+    const ok = document.querySelector('[data-time-ok]');
+    if (ok) ok.onclick = () => {
+      if (!val || dup) return;
+      if (idx >= 0) window.__editorTimes[idx] = val; else window.__editorTimes.push(val);
+      closeModal(); renderEditorTimes();
+    };
+  };
+  paint();
 }
 
 const PARAM_TYPES = [
