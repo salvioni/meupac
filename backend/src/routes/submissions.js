@@ -5,6 +5,7 @@ import { submissionOut, visibleToOperator } from '../serialize.js';
 import { recordHash, signatureHash } from '../hash.js';
 // mesmo cálculo de horários que a tela usa (módulo puro compartilhado com o frontend)
 import { daySlots } from '../../../frontend/src/schedule.js';
+import { unidadeTz, dayKey, hhmm } from '../tz.js';
 
 export const submissionsRouter = Router();
 
@@ -45,12 +46,12 @@ submissionsRouter.post('/', authenticate, requireRole('operador'), (req, res) =>
   const schedule = JSON.parse(form.schedule_json || 'null');
   if (!(schedule && schedule.type === 'demanda')) {
     const cada = form.fill_mode === 'cada';
-    const today = new Date().toDateString();
+    const tz = unidadeTz(db, req.user.unidade_id), today = dayKey(new Date(), tz);
     const dup = db.prepare('SELECT operator_id, operator_name, ts, slot FROM submissions WHERE form_id = ?').all(form.id)
-      .find(r => new Date(r.ts).toDateString() === today && (!slot || r.slot === slot) && (!cada || r.operator_id === req.user.id));
+      .find(r => dayKey(r.ts, tz) === today && (!slot || r.slot === slot) && (!cada || r.operator_id === req.user.id));
     if (dup) {
       const quem = dup.operator_id === req.user.id ? 'Você já registrou' : `${dup.operator_name} já registrou`;
-      const hora = new Date(dup.ts).toTimeString().slice(0, 5);
+      const hora = hhmm(dup.ts, tz);
       return res.status(409).json({ error: `${quem} ${slot ? `o horário ${slot}` : 'esta planilha hoje'} às ${hora}.` });
     }
   }
@@ -130,10 +131,10 @@ submissionsRouter.post('/:id/sign', authenticate, requireRole('gerente'), (req, 
 });
 
 submissionsRouter.post('/sign-all', authenticate, requireRole('gerente'), (req, res) => {
-  // "hoje" no fuso do servidor (TZ), igual ao resto do app — a data UTC do ISO vira o dia às 21h no Brasil
-  const today = new Date().toDateString();
+  // "hoje" no fuso da unidade — a data UTC do ISO viraria o dia às 21h no Brasil
+  const tz = unidadeTz(db, req.user.unidade_id), today = dayKey(new Date(), tz);
   const pending = db.prepare('SELECT id, ts FROM submissions WHERE signed_by IS NULL AND unidade_id = ?').all(req.user.unidade_id)
-    .filter(r => new Date(r.ts).toDateString() === today);
+    .filter(r => dayKey(r.ts, tz) === today);
   const signed = pending.map(p => signOne(p.id, req.user.unidade_id, req.user)).filter(Boolean).map(submissionOut);
   res.json({ signed });
 });

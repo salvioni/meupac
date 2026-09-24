@@ -3,6 +3,7 @@ import { db } from '../db.js';
 import { authenticate, requireTitular, requireRole } from '../middleware.js';
 import { unidadeOut } from '../serialize.js';
 import { toMin } from '../../../frontend/src/schedule.js';
+import { validTz } from '../tz.js';
 
 // 1º turno obrigatório, 2º opcional (ativo: false); cada um com fim depois do início
 function validTurnos(turnos) {
@@ -19,7 +20,9 @@ function validTurnos(turnos) {
 export const unidadeRouter = Router();
 
 unidadeRouter.put('/', authenticate, requireTitular, (req, res) => {
-  const { razaoSocial, marca, cnpj, sif, endereco, municipio, rtNome, rtRegistro, logo } = req.body || {};
+  const { razaoSocial, marca, cnpj, sif, endereco, municipio, rtNome, rtRegistro, logo, timezone } = req.body || {};
+  if (timezone !== undefined && !validTz(timezone)) return res.status(400).json({ error: 'Fuso horário inválido.' });
+  if (timezone !== undefined) db.prepare('UPDATE unidade SET timezone = ? WHERE id = ?').run(timezone, req.user.unidade_id);
   if (logo && logo.length > 2_200_000) return res.status(413).json({ error: 'Logo muito grande (máx ~1,5MB).' });
   db.prepare(`UPDATE unidade SET razao_social=?, marca=?, cnpj=?, sif=?, endereco=?, municipio=?, rt_nome=?, rt_registro=?, logo=? WHERE id=?`)
     .run(razaoSocial || '', marca || '', cnpj || '', sif || '', endereco || '', municipio || '', rtNome || '', rtRegistro || '', logo || null, req.user.unidade_id);

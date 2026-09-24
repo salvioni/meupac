@@ -62,6 +62,23 @@ export async function saveNewPassword() {
   } catch (e) { err.textContent = e.message || 'Não foi possível alterar a senha.'; err.classList.remove('hidden'); }
 }
 
+// fusos do Brasil (um por diferença de horário); se a unidade tiver outro salvo
+// (ex.: detectado no cadastro, como America/Cuiaba), ele aparece também
+const BR_TZ = [
+  ['America/Noronha', 'Fernando de Noronha (UTC−2)'],
+  ['America/Sao_Paulo', 'Brasília (UTC−3)'],
+  ['America/Manaus', 'Amazonas, MT, MS, RO, RR (UTC−4)'],
+  ['America/Rio_Branco', 'Acre (UTC−5)'],
+];
+function tzField(current) {
+  const tz = current || 'America/Sao_Paulo';
+  const opts = BR_TZ.some(([v]) => v === tz) ? BR_TZ : [...BR_TZ, [tz, tz.replace('America/', '').replace('_', ' ')]];
+  return `<div><label class="mono text-[10px] uppercase text-on-surface-variant">Fuso horário da unidade</label>
+    <select id="uni-tz" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] text-on-surface border border-transparent focus:border-primary">
+      ${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === tz ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+    </select></div>`;
+}
+
 export function unidadeSheet() {
   const u = getUnidade(); window.__uniLogo = u.logo || null;
   const fld = (id, label, val, ph) => `<div><label class="mono text-[10px] uppercase text-on-surface-variant">${label}</label><input id="${id}" value="${esc(val || '')}" placeholder="${esc(ph || '')}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] text-on-surface placeholder:text-outline-variant border border-transparent focus:border-primary"></div>`;
@@ -84,6 +101,7 @@ export function unidadeSheet() {
         ${fld('uni-end', 'Endereço', u.endereco)}
         ${fld('uni-mun', 'Município/UF', u.municipio)}
         <div class="grid grid-cols-2 gap-2">${fld('uni-rt', 'Responsável Técnico', u.rtNome)}${fld('uni-rtreg', 'Registro (CRMV)', u.rtRegistro)}</div>
+        ${tzField(u.timezone)}
       </div>
       <button data-action="save-unidade" class="tap w-full mt-4 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px]">Salvar dados da unidade</button>
     </div></div>`;
@@ -101,6 +119,7 @@ export async function saveUnidade() {
     razaoSocial: $('uni-razao').value.trim(), cnpj: $('uni-cnpj').value.trim(), sif: $('uni-sif').value.trim(),
     marca: $('uni-marca').value.trim(), endereco: $('uni-end').value.trim(), municipio: $('uni-mun').value.trim(),
     rtNome: $('uni-rt').value.trim(), rtRegistro: $('uni-rtreg').value.trim(), logo: window.__uniLogo || null,
+    timezone: $('uni-tz').value,
   };
   try { await api.saveUnidade(payload); await api.refreshState(); closeModal(); toast('Dados da unidade salvos.'); }
   catch (e) { toast(e.message || 'Não foi possível salvar.', 'err'); }

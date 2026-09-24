@@ -130,6 +130,8 @@ ensureColumn('submissions', 'slot', 'slot TEXT');
 ensureColumn('forms', 'fill_mode', "fill_mode TEXT NOT NULL DEFAULT 'um'");
 // turnos do expediente da unidade: [{ inicio, fim, ativo }] (null = padrão de schedule.js)
 ensureColumn('unidade', 'turnos_json', 'turnos_json TEXT');
+// fuso da fábrica (IANA, ex.: America/Cuiaba) — define o "hoje" dos registros
+ensureColumn('unidade', 'timezone', 'timezone TEXT');
 // turno de cada pessoa: 0 = 1º, 1 = 2º, NULL = ambos. Na criação da coluna, aproveita
 // o texto livre antigo ("Turno Manhã"/"Turno Tarde") — só dessa vez, pra não desfazer
 // depois uma escolha de "ambos".

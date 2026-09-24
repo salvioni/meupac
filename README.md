@@ -82,15 +82,16 @@ Variáveis de ambiente (opcionais, ver `backend/.env.example`):
   mundo precisa logar de novo quando o servidor reinicia.
 - `MEUPAC_DB` — caminho do arquivo SQLite (padrão `backend/data/meupac.sqlite`).
   Útil pra rodar uma instância de teste sem tocar nos dados reais.
-- `TZ` — fuso horário do servidor (ex.: `America/Sao_Paulo`). Define o que é
-  "hoje" e quando um horário fica atrasado; em servidores na nuvem o padrão é UTC.
+- `TZ` — fuso reserva do servidor (ex.: `America/Sao_Paulo`). Cada unidade tem o
+  seu fuso (detectado no cadastro, ajustável em Dados da unidade), que define o
+  "hoje" dos registros; o `TZ` só vale para unidades sem fuso salvo.
 - `MEUPAC_SEED_DEMO=1` — cria os usuários de exemplo mesmo em produção (não use
   num servidor público: as senhas são conhecidas).
 
 ## Publicar no Render
 
 O repositório tem um `render.yaml` (Blueprint) com tudo configurado: Node 24,
-`NODE_ENV=production`, fuso de São Paulo, `JWT_SECRET` gerado pelo Render e o
+`NODE_ENV=production`, fuso reserva de São Paulo, `JWT_SECRET` gerado pelo Render e o
 banco num **disco persistente** em `/var/data`.
 
 1. Crie uma conta em [render.com](https://render.com) e conecte o GitHub.

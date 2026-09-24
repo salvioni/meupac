@@ -16,7 +16,7 @@ services:
       - key: NODE_ENV
         value: production # exige JWT_SECRET e não cria os usuários de demonstração
       - key: TZ
-        value: America/Sao_Paulo # "hoje", atrasos e horários no fuso da fábrica
+        value: America/Sao_Paulo # só reserva: cada unidade tem o seu fuso (Dados da unidade)
       - key: JWT_SECRET
         generateValue: true # o Render gera um segredo forte e guarda
       - key: MEUPAC_DB

@@ -171,6 +171,8 @@ function renderSignupStep2() {
     try {
       const user = await api.signup({
         ...signupData, razaoSocial,
+        // fuso da fábrica: o do navegador de quem cadastra (ajustável em Dados da unidade)
+        timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { return undefined; } })(),
         cnpj: $('signup-cnpj').value.trim(),
         sif: $('signup-sif').value.trim(),
         endereco: $('signup-endereco').value.trim(),

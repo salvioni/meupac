@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import { validTz } from '../tz.js';
 import { db, seedPacsFor } from '../db.js';
 import { signToken, publicUser } from '../auth.js';
 import { authenticate } from '../middleware.js';
@@ -9,7 +10,7 @@ export const authRouter = Router();
 // cria uma unidade (empresa) nova com seu próprio titular/RT — cada cadastro é um
 // tenant isolado do zero, com seus próprios 15 PACs, sem enxergar dado de ninguém.
 authRouter.post('/signup', (req, res) => {
-  const { razaoSocial, cnpj, sif, endereco, municipio, rtRegistro, adminName, username, password } = req.body || {};
+  const { razaoSocial, cnpj, sif, endereco, municipio, rtRegistro, adminName, username, password, timezone } = req.body || {};
   if (!razaoSocial || !String(razaoSocial).trim()) return res.status(400).json({ error: 'Informe o nome da empresa/unidade.' });
   if (!adminName || !String(adminName).trim()) return res.status(400).json({ error: 'Informe seu nome.' });
   if (!username || !String(username).trim()) return res.status(400).json({ error: 'Escolha um usuário de login.' });
@@ -24,6 +25,8 @@ authRouter.post('/signup', (req, res) => {
   db.prepare(`INSERT INTO unidade (id,razao_social,marca,cnpj,sif,endereco,municipio,rt_nome,rt_registro,logo) VALUES (?,?,?,?,?,?,?,?,?,NULL)`)
     .run(unidadeId, razaoSocial.trim(), '', String(cnpj || '').trim(), String(sif || '').trim(), String(endereco || '').trim(), String(municipio || '').trim(), adminName.trim(), String(rtRegistro || '').trim());
 
+  // fuso detectado no navegador de quem cadastra (a fábrica); dá pra trocar em Dados da unidade
+  if (validTz(timezone)) db.prepare('UPDATE unidade SET timezone = ? WHERE id = ?').run(timezone, unidadeId);
   seedPacsFor(unidadeId);
 
   const userId = 'u' + Date.now() + Math.random().toString(36).slice(2, 6);
