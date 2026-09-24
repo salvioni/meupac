@@ -54,7 +54,7 @@ const whenLabel = f => dueText(f).split(' · ')[0];
 
 export function renderPainel() {
   const { nc, toSign, signed, awaiting } = computeStats();
-  const toSignOk = toSign.filter(s => !s.occurrence); // não conformes assinam na própria seção
+  const toSignOk = toSign.filter(s => !s.occurrence); // conformes a assinar (vêm depois das NC na lista)
   // note: texto pequeno ao lado do número (não muda a altura do cartão)
   const stat = (bg, tx, val, label, ic, valTx, note = '') => `<div class="${bg} rounded-xl p-3.5">
     <div class="flex items-center justify-between"><span class="mono text-[10px] uppercase tracking-wide ${tx} opacity-80">${label}</span>${icon(ic, tx + ' text-[18px]', true)}</div>
@@ -103,9 +103,9 @@ export function renderPainel() {
       ${stat('bg-conf-bg', 'text-conf-tx', signed.length, 'Conformes OK', 'verified')}
       ${stat('bg-surface-container-high', 'text-primary', awaiting.length, 'A Preencher', 'pending_actions', 'text-on-surface-variant')}
     </div>
-    ${signList.length ? `<div><p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mb-2">Para assinar · ${signHead}</p>
+    ${signList.length ? `<div><p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mb-2">${signHead}</p>
       <div class="space-y-2">${signList.map(subCard).join('')}</div>
-      ${toSignOk.length > 1 ? `<button data-action="sign-all" class="tap w-full mt-3 bg-primary text-on-primary rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 text-[14px]">${icon('done_all', '', true)} Assinar os ${toSignOk.length} conformes</button>` : ''}</div>` : ''}
+      ${toSign.length > 1 ? `<button data-action="sign-all" class="tap w-full mt-3 bg-primary text-on-primary rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 text-[14px]">${icon('done_all', '', true)} Assinar todos os ${toSign.length} registros</button>` : ''}</div>` : ''}
     ${awaiting.length ? `<div>${secHead('Aguardando Preenchimento', awaiting.length)}<div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl overflow-hidden divide-y divide-outline-variant/40">${awaitRows}</div></div>` : ''}
     <div class="h-1"></div>
   </div>`;
