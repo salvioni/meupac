@@ -59,33 +59,28 @@ export function renderPainel() {
   const stat = (bg, tx, val, label, ic, valTx, note = '') => `<div class="${bg} rounded-xl p-3.5">
     <div class="flex items-center justify-between"><span class="mono text-[10px] uppercase tracking-wide ${tx} opacity-80">${label}</span>${icon(ic, tx + ' text-[18px]', true)}</div>
     <div class="flex items-baseline gap-2 mt-1"><span class="text-[30px] font-bold ${valTx || tx} leading-none">${String(val).padStart(2, '0')}</span>${note ? `<span class="text-[11px] font-semibold ${tx}">${note}</span>` : ''}</div></div>`;
-  // cada cartão bate com a sua seção: "A Assinar" = aguardando assinatura (conformes);
-  // as não conformes são assinadas na seção delas — o cartão diz quantas faltam
+  // "A Assinar" = todos os botões Assinar da lista; o cartão de não conformes diz
+  // quantas delas ainda faltam assinar
   const ncToSign = nc.filter(s => !s.signedBy).length;
 
   // a não conformidade aparece só aqui (com o Assinar), não também em "aguardando
   // assinatura" — senão parece que são dois registros
   const signBtn = s => `<button data-action="sign" data-sub="${s.id}" class="tap flex items-center gap-1.5 bg-primary text-on-primary text-[12px] font-semibold px-3 py-2 rounded-lg flex-none">${icon('draw', 'text-[16px]')} Assinar</button>`;
-  const ncCards = nc.map(s => {
-    const f = getForm(s.formId), pac = getPac(f.pacId);
+  const subCard = s => {
+    const f = getForm(s.formId);
     return pcard({
-      icon: pac.icon, occ: true, title: f.title,
+      icon: getPac(f.pacId).icon, occ: !!s.occurrence, title: f.title,
       meta: `<span class="truncate">${s.slot ? `Registro das ${s.slot} · ` : ''}${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`,
-      extra: `<div class="text-[11px] text-nc-tx font-semibold truncate mt-0.5">${esc(s.occurrence.issues[0])}</div>`,
+      extra: s.occurrence ? `<div class="text-[11px] text-nc-tx font-semibold truncate mt-0.5">${esc(s.occurrence.issues[0])}</div>` : '',
       trailing: s.signedBy ? `<span class="flex items-center gap-1 text-[11px] font-semibold text-secondary flex-none">${icon('verified', 'text-[16px]', true)} Assinado</span>` : signBtn(s),
       open: `data-action="open-sub" data-sub="${s.id}"`,
     });
-  }).join('');
-
-  const signRows = toSignOk.map(s => {
-    const f = getForm(s.formId);
-    return pcard({
-      icon: getPac(f.pacId).icon, occ: s.occurrence, title: f.title,
-      meta: `<span class="truncate">${s.slot ? `Registro das ${s.slot} · ` : ''}${esc(s.operatorName)} às ${fmtTime(s.ts)}</span>`,
-      trailing: signBtn(s),
-      open: `data-action="open-sub" data-sub="${s.id}"`,
-    });
-  }).join('');
+  };
+  // "para assinar": uma lista só — não conformes a assinar, conformes a assinar e, no fim,
+  // as não conformes já assinadas hoje (continuam visíveis como alerta do dia)
+  const ncOpen = nc.filter(s => !s.signedBy), ncDone = nc.filter(s => s.signedBy);
+  const signList = [...ncOpen, ...toSignOk, ...ncDone];
+  const signHead = [toSign.length ? `${toSign.length} a assinar` : 'tudo assinado', nc.length ? `${nc.length} não conforme${nc.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
 
   // aguardando preenchimento é só informativo (quem preenche é o operador): linhas num
   // cartão único com divisórias, como a lista da Equipe — sem cara de botão
@@ -104,14 +99,13 @@ export function renderPainel() {
     <div><h1 class="text-[26px] font-bold text-on-surface leading-tight">Painel de Hoje</h1><p class="text-[13px] text-on-surface-variant">Conformidades, alertas e assinaturas do dia — atualizado em tempo real.</p></div>
     <div class="grid grid-cols-2 gap-3">
       ${stat('bg-nc-bg', 'text-nc-tx', nc.length, 'Não Conformes', 'warning', '', ncToSign ? `${ncToSign} a assinar` : '')}
-      ${stat('bg-inverse-primary', 'text-primary', toSignOk.length, 'A Assinar', 'draw')}
+      ${stat('bg-inverse-primary', 'text-primary', toSign.length, 'A Assinar', 'draw')}
       ${stat('bg-conf-bg', 'text-conf-tx', signed.length, 'Conformes OK', 'verified')}
       ${stat('bg-surface-container-high', 'text-primary', awaiting.length, 'A Preencher', 'pending_actions', 'text-on-surface-variant')}
     </div>
-    ${nc.length ? `<div>${secHead('Não Conformidades', nc.length)}<div class="space-y-2">${ncCards}</div></div>` : ''}
-    ${toSignOk.length ? `<div>${secHead('Aguardando Assinatura', toSignOk.length)}
-      <div class="space-y-2">${signRows}</div>
-      ${toSignOk.length > 1 ? `<button data-action="sign-all" class="tap w-full mt-3 bg-primary text-on-primary rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 text-[14px]">${icon('done_all', '', true)} Assinar todos os ${toSignOk.length} registros</button>` : ''}</div>` : ''}
+    ${signList.length ? `<div><p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mb-2">Para assinar · ${signHead}</p>
+      <div class="space-y-2">${signList.map(subCard).join('')}</div>
+      ${toSignOk.length > 1 ? `<button data-action="sign-all" class="tap w-full mt-3 bg-primary text-on-primary rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 text-[14px]">${icon('done_all', '', true)} Assinar os ${toSignOk.length} conformes</button>` : ''}</div>` : ''}
     ${awaiting.length ? `<div>${secHead('Aguardando Preenchimento', awaiting.length)}<div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl overflow-hidden divide-y divide-outline-variant/40">${awaitRows}</div></div>` : ''}
     <div class="h-1"></div>
   </div>`;
