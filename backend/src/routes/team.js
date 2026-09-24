@@ -90,9 +90,10 @@ teamRouter.post('/:id/reset-password', authenticate, requireRole('gerente'), (re
   const target = db.prepare('SELECT * FROM users WHERE id = ? AND active = 1 AND unidade_id = ?').get(req.params.id, req.user.unidade_id);
   if (!target) return res.status(404).json({ error: 'Colaborador não encontrado.' });
   if (!canManage(req.user, target)) return res.status(403).json({ error: 'Você não pode redefinir a senha deste colaborador.' });
-  const tempPassword = Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 4).toUpperCase();
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(tempPassword, 10), target.id);
-  res.json({ ok: true, tempPassword });
+  const { password } = req.body || {};
+  if (!password || String(password).length < 6) return res.status(400).json({ error: 'A senha precisa ter pelo menos 6 caracteres.' });
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(String(password), 10), target.id);
+  res.json({ ok: true });
 });
 
 // "Excluir" desativa a conta (perde acesso) sem apagar o histórico assinado em seu nome —

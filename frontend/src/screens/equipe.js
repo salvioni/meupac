@@ -121,14 +121,14 @@ export async function confirmInvite() {
 }
 
 // login e senha na tela até o gestor fechar — pra anotar/passar à pessoa com calma
-function credentialsSheet(name, username, password) {
+function credentialsSheet(name, username, password, title = 'Acesso criado') {
   const line = (label, v) => `<div class="flex items-center justify-between gap-3 py-2">
       <span class="mono text-[10px] uppercase text-on-surface-variant">${label}</span><span class="mono text-[16px] font-bold text-on-surface select-all">${esc(v)}</span></div>`;
   $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-black/40"></div>
     <div class="relative bg-surface-container-lowest rounded-2xl w-full max-w-[360px] shadow-2xl p-5">
       <div class="flex flex-col items-center text-center">${icon('check_circle', 'text-conf-tx text-[40px]', true)}
-        <div class="font-semibold text-on-surface mt-1">Acesso criado para ${esc(name)}</div>
+        <div class="font-semibold text-on-surface mt-1">${title} para ${esc(name)}</div>
         <div class="text-[12px] text-on-surface-variant">Passe estes dados para a pessoa entrar no meuPAC.</div></div>
       <div class="bg-surface-container-low rounded-xl px-4 py-1 mt-4 divide-y divide-outline-variant/40">${line('Usuário', username)}${line('Senha', password)}</div>
       <button id="cred-copy" class="tap w-full mt-3 bg-surface-container text-primary rounded-xl py-3 font-semibold text-[14px] flex items-center justify-center gap-1.5">${icon('content_copy', 'text-[18px]')} Copiar login e senha</button>
@@ -242,25 +242,34 @@ export async function saveMember() {
   } catch (err) { toast(err.message || 'Não foi possível salvar os acessos.', 'err'); }
 }
 
+// o gestor digita a nova senha (ou gera uma) — mesma ideia da criação do acesso
 export function confirmResetPassword(id) {
   const t = DB.team.find(x => x.id === id); if (!t) return;
   $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-center justify-center p-4" data-close-modal>
     <div class="absolute inset-0 bg-black/40" data-close-modal></div>
     <div class="relative bg-surface-container-lowest rounded-2xl w-full max-w-[380px] shadow-2xl p-5">
-      <div class="flex items-center gap-2 mb-2">${icon('key', 'text-primary text-[24px]', true)}<div class="font-semibold text-on-surface text-[16px]">Redefinir senha de ${esc(t.name)}?</div></div>
-      <p class="text-[13px] text-on-surface-variant mb-4">A senha atual deixa de funcionar e uma nova senha temporária é gerada na hora — repasse para ${esc(t.name.split(' ')[0])}.</p>
-      <div class="flex gap-2">
+      <div class="flex items-center gap-2 mb-1">${icon('key', 'text-primary text-[24px]', true)}<div class="font-semibold text-on-surface text-[16px]">Nova senha de ${esc(t.name)}</div></div>
+      <p class="text-[13px] text-on-surface-variant mb-3">A senha atual deixa de funcionar.</p>
+      <label class="mono text-[10px] uppercase text-on-surface-variant">Nova senha</label>
+      <div class="flex gap-2 mt-1">
+        <input id="rst-pass" type="text" autocomplete="off" autocapitalize="none" placeholder="mínimo 6 caracteres" class="${inputCls} !mt-0 mono">
+        <button id="rst-gen" class="tap flex-none px-3 rounded-lg bg-surface-container text-primary text-[12px] font-semibold">Gerar</button>
+      </div>
+      <div class="flex gap-2 mt-4">
         <button data-action="close-x" class="tap flex-1 bg-surface-container text-on-surface rounded-xl py-3 font-semibold text-[14px]">Cancelar</button>
-        <button data-action="reset-pass-confirm" data-id="${t.id}" class="tap flex-1 bg-primary text-on-primary rounded-xl py-3 font-semibold text-[14px]">Redefinir</button>
+        <button data-action="reset-pass-confirm" data-id="${t.id}" class="tap flex-1 bg-primary text-on-primary rounded-xl py-3 font-semibold text-[14px]">Salvar senha</button>
       </div>
     </div></div>`;
+  $('rst-gen').onclick = () => { $('rst-pass').value = suggestPassword(); };
 }
 
 export async function resetMemberPassword(id) {
+  const t = DB.team.find(x => x.id === id); if (!t) return;
+  const password = $('rst-pass').value.trim();
+  if (password.length < 6) { toast('A senha precisa ter pelo menos 6 caracteres.', 'err'); return; }
   try {
-    const { tempPassword } = await api.resetMemberPassword(id);
-    closeModal();
-    toast(`Senha redefinida. Nova senha temporária: ${tempPassword}`, 'info');
+    await api.resetMemberPassword(id, password);
+    credentialsSheet(t.name, t.username, password, 'Senha redefinida');
   } catch (e) { toast(e.message || 'Não foi possível redefinir a senha.', 'err'); }
 }
 

@@ -47,7 +47,7 @@ export function unidadeOut(u) {
 
 export function teamMemberOut(u) {
   return {
-    id: u.id, name: u.name, role: u.role, titular: !!u.titular,
+    id: u.id, name: u.name, username: u.username, role: u.role, titular: !!u.titular,
     cargo: u.cargo, turno: u.turno, turnoIdx: u.turno_idx ?? null, matricula: u.matricula,
     initials: u.initials, color: u.color, ink: u.ink, active: !!u.active,
   };

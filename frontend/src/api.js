@@ -116,8 +116,8 @@ export async function updateMember(id, role, ownedFormIds, turnoIdx = null) {
 export async function deleteMember(id) {
   return request(`/team/${id}`, { method: 'DELETE' });
 }
-export async function resetMemberPassword(id) {
-  return request(`/team/${id}/reset-password`, { method: 'POST' });
+export async function resetMemberPassword(id, password) {
+  return request(`/team/${id}/reset-password`, { method: 'POST', body: { password } });
 }
 
 export async function saveUnidade(payload) {
