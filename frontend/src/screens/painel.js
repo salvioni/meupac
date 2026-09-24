@@ -76,7 +76,8 @@ export function renderPainel() {
   // as não conformes já assinadas hoje (continuam visíveis como alerta do dia)
   const ncOpen = nc.filter(s => !s.signedBy), ncDone = nc.filter(s => s.signedBy);
   const signList = [...ncOpen, ...toSignOk, ...ncDone];
-  const signHead = [toSign.length ? `${toSign.length} a assinar` : 'tudo assinado', nc.length ? `${nc.length} não conforme${nc.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+  // mesmo formato dos outros títulos ("descrição · número"), um bloco pra cada
+  const signHead = [toSign.length ? `A assinar · ${toSign.length}` : '', nc.length ? `Não conformes · ${nc.length}` : ''].filter(Boolean).map(t => `<span>${t}</span>`).join('');
 
   // aguardando preenchimento é só informativo (quem preenche é o operador): linhas num
   // cartão único com divisórias, como a lista da Equipe — sem cara de botão
@@ -99,7 +100,7 @@ export function renderPainel() {
       ${stat('bg-conf-bg', 'text-conf-tx', signed.length, 'Conformes OK', 'verified')}
       ${stat('bg-surface-container-high', 'text-primary', awaiting.length, 'A Preencher', 'pending_actions', 'text-on-surface-variant')}
     </div>
-    ${signList.length ? `<div><p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mb-2">${signHead}</p>
+    ${signList.length ? `<div><p class="flex gap-5 mono text-[10px] uppercase tracking-widest text-on-surface-variant mb-2">${signHead}</p>
       <div class="space-y-2">${signList.map(subCard).join('')}</div>
       ${toSign.length > 1 ? `<button data-action="sign-all" class="tap w-full mt-3 bg-primary text-on-primary rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 text-[14px]">${icon('done_all', '', true)} Assinar todos os ${toSign.length} registros</button>` : ''}</div>` : ''}
     ${awaiting.length ? `<div>${secHead('Aguardando Preenchimento', awaiting.length)}<div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl overflow-hidden divide-y divide-outline-variant/40">${awaitRows}</div></div>` : ''}
