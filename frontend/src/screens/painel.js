@@ -55,9 +55,13 @@ const whenLabel = f => dueText(f).split(' · ')[0];
 export function renderPainel() {
   const { nc, toSign, signed, awaiting } = computeStats();
   const toSignOk = toSign.filter(s => !s.occurrence); // não conformes assinam na própria seção
-  const stat = (bg, tx, val, label, ic, valTx) => `<div class="${bg} rounded-xl p-3.5">
+  // note: texto pequeno ao lado do número (não muda a altura do cartão)
+  const stat = (bg, tx, val, label, ic, valTx, note = '') => `<div class="${bg} rounded-xl p-3.5">
     <div class="flex items-center justify-between"><span class="mono text-[10px] uppercase tracking-wide ${tx} opacity-80">${label}</span>${icon(ic, tx + ' text-[18px]', true)}</div>
-    <div class="text-[30px] font-bold ${valTx || tx} leading-none mt-1">${String(val).padStart(2, '0')}</div></div>`;
+    <div class="flex items-baseline gap-2 mt-1"><span class="text-[30px] font-bold ${valTx || tx} leading-none">${String(val).padStart(2, '0')}</span>${note ? `<span class="text-[11px] font-semibold ${tx}">${note}</span>` : ''}</div></div>`;
+  // cada cartão bate com a sua seção: "A Assinar" = aguardando assinatura (conformes);
+  // as não conformes são assinadas na seção delas — o cartão diz quantas faltam
+  const ncToSign = nc.filter(s => !s.signedBy).length;
 
   // a não conformidade aparece só aqui (com o Assinar), não também em "aguardando
   // assinatura" — senão parece que são dois registros
@@ -99,8 +103,8 @@ export function renderPainel() {
   const inner = `<div class="px-4 py-5 space-y-5">
     <div><h1 class="text-[26px] font-bold text-on-surface leading-tight">Painel de Hoje</h1><p class="text-[13px] text-on-surface-variant">Conformidades, alertas e assinaturas do dia — atualizado em tempo real.</p></div>
     <div class="grid grid-cols-2 gap-3">
-      ${stat('bg-nc-bg', 'text-nc-tx', nc.length, 'Não Conformes', 'warning')}
-      ${stat('bg-inverse-primary', 'text-primary', toSign.length, 'A Assinar', 'draw')}
+      ${stat('bg-nc-bg', 'text-nc-tx', nc.length, 'Não Conformes', 'warning', '', ncToSign ? `${ncToSign} a assinar` : '')}
+      ${stat('bg-inverse-primary', 'text-primary', toSignOk.length, 'A Assinar', 'draw')}
       ${stat('bg-conf-bg', 'text-conf-tx', signed.length, 'Conformes OK', 'verified')}
       ${stat('bg-surface-container-high', 'text-primary', awaiting.length, 'A Preencher', 'pending_actions', 'text-on-surface-variant')}
     </div>
