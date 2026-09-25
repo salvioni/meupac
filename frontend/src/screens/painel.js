@@ -1,10 +1,10 @@
 import { $, esc, icon, fmtTime, isToday, toast } from '../helpers.js';
-import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, formOwners, slotVisibleTo, dueText, pendingSlots, isCada, formSlots, dayProgress } from '../state.js';
+import { DB, getForm, getPac, pacActive, formActive, formStatus, dueMinutesToday, formOwners, slotVisibleTo, dueText, pendingSlots, isCada, formSlots, dayProgress, unitTurnos } from '../state.js';
 import { shell, profileTrigger, pcard, secHead } from '../ui.js';
 import { GE_NAV, STATUS_META } from '../config.js';
 import * as api from '../api.js';
 import { rerender } from '../router.js';
-import { toMin } from '../schedule.js';
+import { toMin, turnosDefinidos } from '../schedule.js';
 
 const app = () => $('app');
 
@@ -115,8 +115,9 @@ export function renderPainel() {
 function firstSteps() {
   const hasOp = (DB.team || []).some(t => t.role === 'operador' && t.active !== false);
   const steps = [
+    ['Definir o horário do expediente', turnosDefinidos(unitTurnos()), 'Em Equipe, no cartão Turnos, toque em Definir'],
     ['Criar a primeira planilha', DB.forms.length > 0, 'Em PACs, abra um PAC e toque em Nova Planilha'],
-    ['Dar acesso a um operador', hasOp, 'Em Equipe, toque em Convidar'],
+    ['Dar acesso a um operador', hasOp, 'Em Equipe, toque em Convidar e escolha as planilhas dele'],
     ['Receber o primeiro registro', DB.submissions.length > 0, 'O operador entra com o login dele e preenche'],
   ];
   if (steps.every(x => x[1])) return '';
@@ -124,7 +125,7 @@ function firstSteps() {
       ${icon(ok ? 'check_circle' : 'radio_button_unchecked', (ok ? 'text-secondary' : 'text-outline-variant') + ' text-[22px] flex-none', ok)}
       <div class="min-w-0"><div class="text-[14px] font-semibold ${ok ? 'text-on-surface-variant line-through' : 'text-on-surface'}">${t}</div>${ok ? '' : `<div class="text-[12px] text-on-surface-variant">${hint}</div>`}</div>
     </div>`;
-  const canGuide = !DB.forms.length || !hasOp; // o tutorial cobre planilha e operador
+  const canGuide = steps.slice(0, 3).some(x => !x[1]); // o tutorial cobre expediente, planilha e operador
   return `<div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-4">
     <div class="flex items-center gap-2 mb-1">${icon('rocket_launch', 'text-secondary text-[20px]', true)}<h2 class="font-semibold text-on-surface text-[15px]">Primeiros passos</h2></div>
     <div class="divide-y divide-outline-variant/40">${steps.map(row).join('')}</div>

@@ -1,41 +1,89 @@
 // Tutorial interativo do gestor: destaca na tela onde tocar (PACs → ligar/desligar →
-// abrir um PAC → Nova Planilha → editor → Equipe → Convidar) e avança sozinho quando a
-// pessoa faz o passo. Começa sozinho numa unidade sem nenhuma planilha; dá pra pular e
-// recomeçar pelo cartão "Primeiros passos" do painel.
+// abrir um PAC → Nova Planilha → editor → Equipe → turnos → Convidar → planilhas do
+// operador) e avança sozinho quando a pessoa faz o passo. Nos passos do editor, o
+// "Próximo" só libera com o campo preenchido. Começa sozinho numa unidade sem nenhuma
+// planilha; dá pra pular e recomeçar pelo cartão "Primeiros passos" do painel.
 //
 // Estilos inline de propósito: o Tailwind do CDN gera classes de forma assíncrona, então
 // o balão e o destaque não podem depender delas. Pelo mesmo motivo a posição é
 // recalculada a cada 250 ms (o alvo muda de tamanho quando as classes chegam).
-import { DB, currentUser, screen } from './state.js';
+import { DB, currentUser, screen, params, getForm, getPac, unitTurnos } from './state.js';
+import { turnosDefinidos } from './schedule.js';
+import { titleProblem, whenProblem, paramsProblem } from './screens/formEditor.js';
 import { esc } from './helpers.js';
 
-const hasOperator = () => (DB.team || []).some(t => t.role === 'operador' && t.active !== false);
+// exemplo de planilha de cada PAC, pro tutorial falar do PAC que a pessoa abriu
+// (e não de cloro quando ela está em Manutenção)
+const EXAMPLES = {
+  'PAC 01': ['Verificação de equipamentos', 'estado de conservação (conforme/não conforme)'],
+  'PAC 02': ['Controle de cloro e pH da água', 'cloro livre entre 0,5 e 2,0 ppm'],
+  'PAC 03': ['Inspeção de armadilhas e iscas', 'sinais de pragas em cada ponto'],
+  'PAC 04': ['Higienização pós-operacional', 'limpeza de pisos, paredes e equipamentos'],
+  'PAC 05': ['Barreira sanitária', 'uniforme completo e mãos higienizadas'],
+  'PAC 06': ['PSO pré-operacional', 'mesas, esteiras e utensílios limpos antes de começar'],
+  'PAC 07': ['Recebimento de matéria-prima', 'temperatura e documentação do lote'],
+  'PAC 08': ['Temperatura das câmaras frias', 'câmara de resfriados entre −1 e 4 °C'],
+  'PAC 09': ['Monitoramento do PCC', 'o limite crítico do ponto de controle'],
+  'PAC 10': ['Coleta de amostras', 'amostra coletada e enviada ao laboratório'],
+  'PAC 11': ['Conferência de formulação', 'ingredientes e quantidades da receita'],
+  'PAC 12': ['Rastreabilidade de lotes', 'lote e data de produção identificados'],
+  'PAC 13': ['Conferência para certificação', 'documentos do lote certificado'],
+  'PAC 14': ['Bem-estar no desembarque', 'condução e descanso dos animais'],
+  'PAC 15': ['Segregação de MER', 'retirada e destino de cada material'],
+};
+function example() {
+  const f = params.form ? getForm(params.form) : null;
+  const pac = getPac(f ? f.pacId : params.pac);
+  return (pac && EXAMPLES[pac.code]) || ['Controle diário', 'o que precisa ser conferido'];
+}
 
+// sugere a Água (costuma ser a primeira planilha de uma unidade); se estiver desligada, o primeiro PAC ligado
+function suggestedPac() {
+  const on = DB.pacs.filter(p => p.active !== false);
+  const p = on.find(x => x.code === 'PAC 02') || on[0] || DB.pacs[0];
+  return p ? `[data-action="open-pac"][data-pac="${p.id}"]` : '[data-action="open-pac"]';
+}
+
+const operators = () => (DB.team || []).filter(t => t.role === 'operador' && t.active !== false);
+const hasOperator = () => operators().length > 0;
+const hasAccess = () => operators().some(t => (t.ownedFormIds || []).length > 0);
+const modalOpen = () => !!document.querySelector('#modal-root > *');
+
+// target/text podem ser funções; ready() devolve o que falta (trava o "Próximo");
+// modal: true = o passo continua na tela com uma folha aberta (turnos, acessos)
 const STEPS = [
   { id: 'welcome', screens: ['ge_painel'], title: 'Bem-vindo ao meuPAC', next: 'Começar',
-    text: 'Em poucos passos sua unidade fica pronta: escolher os PACs, criar a primeira planilha e dar acesso a quem vai preencher.' },
+    text: 'Em poucos passos sua unidade fica pronta: escolher os PACs, criar a primeira planilha, definir o expediente e dar acesso a quem vai preencher.' },
   { id: 'nav-pacs', screens: ['ge_painel', 'ge_hist', 'ge_equipe'], target: '[data-action="nav"][data-nav="ge_forms"]',
     text: 'Toque em <b>PACs</b>.', until: () => screen === 'ge_forms' },
   { id: 'toggle', screens: ['ge_forms'], target: '[data-action="toggle-pac-active"]', title: 'Ligue só o que a unidade usa', next: 'Entendi',
     text: 'Estes são os 15 PACs do RIISPOA, todos ligados. Desligue no botão ao lado os que sua unidade não usa — dá pra mudar a qualquer hora.' },
-  { id: 'open-pac', screens: ['ge_forms'], target: '[data-action="open-pac"]',
-    text: 'Toque num PAC para ver e criar as planilhas dele.', until: () => screen === 'ge_pac_forms' },
+  { id: 'open-pac', screens: ['ge_forms'], target: suggestedPac,
+    text: 'Toque num PAC para criar as planilhas dele — por exemplo <b>Água de Abastecimento</b>. Pode ser qualquer um.', until: () => screen === 'ge_pac_forms' },
   { id: 'new-form', screens: ['ge_pac_forms'], target: '[data-action="new-form"]',
     text: 'Toque em <b>Nova Planilha</b> para criar o que o operador vai preencher.', until: () => screen === 'ge_form_editor' },
-  { id: 'ed-title', screens: ['ge_form_editor'], target: '#ed-title', next: 'Próximo',
-    text: 'Dê um nome à planilha. Ex.: “Controle de Cloro”.' },
-  { id: 'ed-when', screens: ['ge_form_editor'], target: '#ed-when-wrap', next: 'Próximo',
+  { id: 'ed-title', screens: ['ge_form_editor'], target: '#ed-title', next: 'Próximo', ready: titleProblem,
+    text: () => `Dê um nome à planilha. Ex.: “${example()[0]}”.` },
+  { id: 'ed-when', screens: ['ge_form_editor'], target: '#ed-when-wrap', next: 'Próximo', ready: whenProblem,
     text: 'Escolha <b>quando</b> preencher: horários fixos, a cada X horas, X vezes ao dia, no início/fim do turno ou sob demanda. Em <b>Fixos</b>, toque em <b>Adicionar horário</b> (ou ligue “Sem horário específico”).' },
-  { id: 'ed-params', screens: ['ge_form_editor'], target: '#ed-params', next: 'Próximo',
-    text: 'O que o operador mede e a faixa aceitável. Valor fora da faixa vira <b>não conformidade</b> no painel.' },
+  { id: 'ed-params', screens: ['ge_form_editor'], target: '#ed-params', next: 'Próximo', ready: paramsProblem,
+    text: () => `O que o operador confere — ex.: ${example()[1]}. Dê um título e, em Mín/Máx, a faixa aceitável: fora dela vira <b>não conformidade</b> no painel.` },
   { id: 'ed-save', screens: ['ge_form_editor'], target: '[data-action="save-form"]',
     text: 'Pronto? Toque em <b>Criar Planilha</b>.', until: () => DB.forms.length > 0 },
   { id: 'nav-equipe', screens: ['ge_painel', 'ge_hist', 'ge_forms', 'ge_pac_forms'], target: '[data-action="nav"][data-nav="ge_equipe"]', title: 'Planilha criada!',
-    text: 'Agora crie o acesso de quem vai preencher. Toque em <b>Equipe</b>.', until: () => screen === 'ge_equipe' || hasOperator() },
-  { id: 'invite', screens: ['ge_equipe'], target: '[data-action="invite"]',
-    text: 'Toque em <b>Convidar</b>, crie login e senha e escolha o turno. O operador entra com esse login e vê as planilhas do turno dele.', until: hasOperator },
+    text: 'Agora vamos preparar a equipe. Toque em <b>Equipe</b>.', until: () => screen === 'ge_equipe' },
+  { id: 'turnos', screens: ['ge_equipe'], modal: true, until: () => turnosDefinidos(unitTurnos()),
+    target: () => (modalOpen() ? '#uni-t0-times, [data-action="save-turnos"]' : '[data-action="edit-turnos"]'),
+    text: () => (modalOpen() ? 'Informe o início e o fim do expediente (e ligue o 2º turno, se houver) e toque em <b>Salvar turnos</b>.'
+      : 'Primeiro, o horário do expediente da fábrica. Toque em <b>Definir</b>.') },
+  { id: 'invite', screens: ['ge_equipe'], target: '[data-action="invite"]', until: hasOperator,
+    text: 'Agora toque em <b>Convidar</b> e crie o login e a senha de quem vai preencher.' },
+  { id: 'access', screens: ['ge_equipe'], modal: true, until: hasAccess, next: 'Deixar para todos',
+    target: () => (modalOpen() ? '[data-action="edit-form-toggle"], [data-action="save-member"]' : '[data-action="edit-member"]'),
+    text: () => (modalOpen() ? 'Marque as planilhas que ele preenche e toque em <b>Salvar acessos</b>.'
+      : 'Escolha as planilhas desse operador: toque aqui. (Planilha sem ninguém marcado fica liberada para todos os operadores.)') },
   { id: 'done', screens: ['ge_painel', 'ge_hist', 'ge_forms', 'ge_pac_forms', 'ge_equipe'], title: 'Tudo pronto!', next: 'Fechar',
-    text: 'Quando o operador enviar, os registros aparecem no <b>Painel</b> para você assinar. Dá pra criar mais planilhas em PACs quando quiser.' },
+    text: 'O operador entra com o login dele e preenche. Os registros aparecem no <b>Painel</b> para você assinar. Dá pra criar mais planilhas em PACs quando quiser.' },
 ];
 
 const key = () => 'meupac_tour_v1_' + (currentUser ? currentUser.id : '');
@@ -69,7 +117,19 @@ function advance() {
 }
 
 function visible(el) { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
-function findTarget(sel) { return [...document.querySelectorAll(sel)].find(visible) || null; }
+// um seletor com vírgula destaca a área que cobre todos (ex.: lista + botão salvar),
+// pra o balão não cair em cima do botão que a pessoa precisa tocar
+function findTarget(sel) {
+  const els = [...document.querySelectorAll(sel)].filter(visible);
+  if (!els.length) return null;
+  if (!sel.includes(',')) return els[0];
+  return { els, getBoundingClientRect() {
+    const rs = els.map(e => e.getBoundingClientRect());
+    const left = Math.min(...rs.map(r => r.left)), top = Math.min(...rs.map(r => r.top));
+    const right = Math.max(...rs.map(r => r.right)), bottom = Math.max(...rs.map(r => r.bottom));
+    return { left, top, right, bottom, width: right - left, height: bottom - top };
+  }, scrollIntoView(o) { els[els.length - 1].scrollIntoView(o); } };
+}
 
 function hide() {
   const root = document.getElementById('tour-root'); if (root) root.remove();
@@ -87,9 +147,8 @@ export function tourTick() {
   if (s.step >= STEPS.length) { s.done = true; save(s); hide(); return; }
   save(s);
   const step = STEPS[s.step];
-  const modalOpen = !!document.querySelector('#modal-root > *');
-  if (!step.screens.includes(screen) || modalOpen) { hideBubbleOnly(); ensureTimer(); return; }
-  const target = step.target ? findTarget(step.target) : null;
+  if (!step.screens.includes(screen) || (modalOpen() && !step.modal)) { hideBubbleOnly(); ensureTimer(); return; }
+  const target = step.target ? findTarget(typeof step.target === 'function' ? step.target() : step.target) : null;
   if (step.target && !target) { hideBubbleOnly(); ensureTimer(); return; } // tela ainda carregando
   paint(step, target);
   ensureTimer();
@@ -108,17 +167,19 @@ function paint(step, target) {
     document.body.appendChild(root);
     root.addEventListener('click', e => {
       const b = e.target.closest('[data-tour-btn]'); if (!b) return;
-      if (b.dataset.tourBtn === 'next') advance(); else skipTour();
+      if (b.dataset.tourBtn === 'next') { if (!b.disabled) advance(); } else skipTour();
     });
   }
   root.style.display = '';
   const spot = root.querySelector('[data-tour-spot]'), dim = root.querySelector('[data-tour-dim]'), bubble = root.querySelector('[data-tour-bubble]');
 
-  if (shownStep !== step.id) {
-    shownStep = step.id;
+  const shownKey = step.id + (modalOpen() ? ':modal' : '');
+  if (shownStep !== shownKey) {
+    shownStep = shownKey;
     const n = STEPS.indexOf(step);
     bubble.innerHTML = `${step.title ? `<div style="font-weight:700;font-size:15px;margin-bottom:4px">${esc(step.title)}</div>` : ''}
-      <div style="color:#44474d">${step.text}</div>
+      <div style="color:#44474d">${typeof step.text === 'function' ? step.text() : step.text}</div>
+      <div data-tour-hint style="display:none;margin-top:8px;font-size:12px;font-weight:600;color:#8a4505"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px">
         <button data-tour-btn="skip" style="background:none;border:0;padding:6px 0;color:#44474d;font:inherit;font-size:12px;text-decoration:underline;cursor:pointer">${step.id === 'done' ? '' : 'Pular tutorial'}</button>
         <span style="display:flex;align-items:center;gap:10px">
@@ -129,6 +190,15 @@ function paint(step, target) {
     // o alvo pode estar fora da tela (ex.: botão salvar no fim do editor)
     if (target) target.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
+
+  // "Próximo" travado enquanto falta preencher (passos do editor)
+  const problem = step.ready ? step.ready() : null;
+  const nextBtn = bubble.querySelector('[data-tour-btn="next"]'), hint = bubble.querySelector('[data-tour-hint]');
+  if (nextBtn) { nextBtn.disabled = !!problem; nextBtn.style.opacity = problem ? '.4' : '1'; nextBtn.style.cursor = problem ? 'not-allowed' : 'pointer'; }
+  if (hint) { hint.textContent = problem || ''; hint.style.display = problem ? '' : 'none'; }
+  // com uma folha aberta (z-50), o tutorial fica por cima dela
+  const z = modalOpen() ? 60 : 45;
+  spot.style.zIndex = dim.style.zIndex = z; bubble.style.zIndex = z + 1;
 
   const vw = window.innerWidth, vh = window.innerHeight, bw = Math.min(320, vw - 32);
   if (!target) {
@@ -143,7 +213,8 @@ function paint(step, target) {
   Object.assign(spot.style, { left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + pad * 2 + 'px', height: r.height + pad * 2 + 'px' });
   const bh = bubble.offsetHeight || 140;
   const below = r.bottom + pad + 12, above = r.top - pad - 12 - bh;
-  const top = below + bh <= vh - 8 ? below : above >= 8 ? above : Math.max(8, vh - bh - 8);
+  // numa folha aberta, o balão vai acima (embaixo costuma estar o botão de salvar)
+  const top = modalOpen() && above >= 8 ? above : below + bh <= vh - 8 ? below : above >= 8 ? above : Math.max(8, vh - bh - 8);
   const left = Math.min(Math.max(16, r.left + r.width / 2 - bw / 2), vw - bw - 16);
   bubble.style.left = Math.round(left) + 'px';
   bubble.style.top = Math.round(top) + 'px';

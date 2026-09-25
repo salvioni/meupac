@@ -1,4 +1,5 @@
 import { $, esc, icon, toast } from '../helpers.js';
+import { cnpjField, municipioField, wireBrFields, readBrFields } from '../brFields.js';
 import { currentUser, getUnidade } from '../state.js';
 import * as api from '../api.js';
 import { closeModal } from '../router.js';
@@ -79,6 +80,9 @@ function tzField(current) {
     </select></div>`;
 }
 
+const UNI_LABEL = 'mono text-[10px] uppercase text-on-surface-variant';
+const UNI_INPUT = 'w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] text-on-surface placeholder:text-outline-variant border border-transparent focus:border-primary';
+
 export function unidadeSheet() {
   const u = getUnidade(); window.__uniLogo = u.logo || null;
   const fld = (id, label, val, ph) => `<div><label class="mono text-[10px] uppercase text-on-surface-variant">${label}</label><input id="${id}" value="${esc(val || '')}" placeholder="${esc(ph || '')}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] text-on-surface placeholder:text-outline-variant border border-transparent focus:border-primary"></div>`;
@@ -96,15 +100,16 @@ export function unidadeSheet() {
       </div>
       <div class="space-y-3">
         ${fld('uni-razao', 'Razão Social', u.razaoSocial)}
-        <div class="grid grid-cols-2 gap-2">${fld('uni-cnpj', 'CNPJ', u.cnpj)}${fld('uni-sif', 'Nº do SIF/registro', u.sif)}</div>
+        <div class="grid grid-cols-2 gap-2">${cnpjField('uni-cnpj', 'CNPJ', u.cnpj, UNI_INPUT, UNI_LABEL)}${fld('uni-sif', 'Nº do SIF/registro', u.sif)}</div>
         ${fld('uni-marca', 'Marca (se houver)', u.marca)}
         ${fld('uni-end', 'Endereço', u.endereco)}
-        ${fld('uni-mun', 'Município/UF', u.municipio)}
+        ${municipioField('uni-mun', u.municipio, UNI_INPUT, UNI_LABEL)}
         <div class="grid grid-cols-2 gap-2">${fld('uni-rt', 'Responsável Técnico', u.rtNome)}${fld('uni-rtreg', 'Registro (CRMV)', u.rtRegistro)}</div>
         ${tzField(u.timezone)}
       </div>
       <button data-action="save-unidade" class="tap w-full mt-4 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px]">Salvar dados da unidade</button>
     </div></div>`;
+  wireBrFields('uni-cnpj', 'uni-mun');
   const li = $('uni-logo'); if (li) li.onchange = () => {
     const f = li.files && li.files[0]; if (!f) return;
     if (f.size > 1500000) { toast('Logo muito grande (máx ~1,5MB).', 'err'); return; }
@@ -115,9 +120,11 @@ export function unidadeSheet() {
 }
 
 export async function saveUnidade() {
+  const br = readBrFields('uni-cnpj', 'uni-mun');
+  if (br.error) { toast(br.error, 'err'); return; }
   const payload = {
-    razaoSocial: $('uni-razao').value.trim(), cnpj: $('uni-cnpj').value.trim(), sif: $('uni-sif').value.trim(),
-    marca: $('uni-marca').value.trim(), endereco: $('uni-end').value.trim(), municipio: $('uni-mun').value.trim(),
+    razaoSocial: $('uni-razao').value.trim(), cnpj: br.cnpj, sif: $('uni-sif').value.trim(),
+    marca: $('uni-marca').value.trim(), endereco: $('uni-end').value.trim(), municipio: br.municipio,
     rtNome: $('uni-rt').value.trim(), rtRegistro: $('uni-rtreg').value.trim(), logo: window.__uniLogo || null,
     timezone: $('uni-tz').value,
   };

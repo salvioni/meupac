@@ -1,4 +1,5 @@
 import { $, icon } from '../helpers.js';
+import { cnpjField, municipioField, wireBrFields, readBrFields } from '../brFields.js';
 import { logo } from '../ui.js';
 import * as api from '../api.js';
 import { afterLogin } from '../router.js';
@@ -86,9 +87,11 @@ function renderLoginView() {
   wireGo();
 }
 
+const SIGNUP_LABEL = 'mono text-[10px] uppercase tracking-widest text-on-surface-variant';
+const SIGNUP_INPUT = 'w-full mt-1 bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-[14px] text-on-surface focus:border-primary';
 const field = (id, label, ph, opts = '', val = '') => `<div>
-    <label class="mono text-[10px] uppercase tracking-widest text-on-surface-variant">${label}</label>
-    <input id="${id}" ${opts} value="${val}" placeholder="${ph}" class="w-full mt-1 bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-[14px] text-on-surface focus:border-primary">
+    <label class="${SIGNUP_LABEL}">${label}</label>
+    <input id="${id}" ${opts} value="${val}" placeholder="${ph}" class="${SIGNUP_INPUT}">
   </div>`;
 const stepDots = (n) => `<div class="flex items-center gap-1.5 mb-5">
     <span class="h-1.5 rounded-full ${n >= 1 ? 'bg-primary' : 'bg-outline-variant'} flex-1"></span>
@@ -148,16 +151,17 @@ function renderSignupStep2() {
       <div id="signup-err-2" class="hidden bg-nc-bg text-nc-tx text-[13px] font-medium rounded-lg px-3 py-2.5"></div>
       <div class="grid sm:grid-cols-2 gap-3">
         <div class="sm:col-span-2">${field('signup-empresa', 'Razão social', 'Frigorífico Serra Verde Ltda.', '', signupData.razaoSocial || '')}</div>
-        ${field('signup-cnpj', 'CNPJ', '12.345.678/0001-90', '', signupData.cnpj || '')}
+        ${cnpjField('signup-cnpj', 'CNPJ', signupData.cnpj || '', SIGNUP_INPUT, SIGNUP_LABEL)}
         ${field('signup-sif', 'Nº do SIF/registro', 'SIF 4412', '', signupData.sif || '')}
         <div class="sm:col-span-2">${field('signup-endereco', 'Endereço', 'Rod. BR-262, km 12 — Zona Rural', '', signupData.endereco || '')}</div>
-        ${field('signup-municipio', 'Município/UF', 'Serra Verde/MG', '', signupData.municipio || '')}
+        ${municipioField('signup-mun', signupData.municipio || '', SIGNUP_INPUT, SIGNUP_LABEL)}
         ${field('signup-rtregistro', 'Registro do RT (CRMV)', 'CRMV-SP 14.892', '', signupData.rtRegistro || '')}
       </div>
       <button type="submit" id="signup-submit-2" class="tap w-full flex items-center justify-center gap-2 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px] mt-1">${icon('add_business', '', true)} Criar empresa e conta</button>
     </form>`, { width: 560 });
 
   $('signup-back').onclick = () => { signupStep = 1; renderLogin(); };
+  wireBrFields('signup-cnpj', 'signup-mun');
 
   const form = $('signup-form-2');
   form.onsubmit = async (e) => {
@@ -167,16 +171,18 @@ function renderSignupStep2() {
     if (!razaoSocial) {
       errBox.textContent = 'Informe a razão social da empresa.'; errBox.classList.remove('hidden'); return;
     }
+    const br = readBrFields('signup-cnpj', 'signup-mun');
+    if (br.error) { errBox.textContent = br.error; errBox.classList.remove('hidden'); return; }
     const btn = $('signup-submit-2'); btn.disabled = true; btn.classList.add('opacity-60');
     try {
       const user = await api.signup({
         ...signupData, razaoSocial,
         // fuso da fábrica: o do navegador de quem cadastra (ajustável em Dados da unidade)
         timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { return undefined; } })(),
-        cnpj: $('signup-cnpj').value.trim(),
+        cnpj: br.cnpj,
         sif: $('signup-sif').value.trim(),
         endereco: $('signup-endereco').value.trim(),
-        municipio: $('signup-municipio').value.trim(),
+        municipio: br.municipio,
         rtRegistro: $('signup-rtregistro').value.trim(),
       });
       mode = 'login'; signupStep = 1; signupData = {};

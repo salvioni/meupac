@@ -4,7 +4,7 @@ import { shell, profileTrigger } from '../ui.js';
 import { GE_NAV } from '../config.js';
 import * as api from '../api.js';
 import { navigate, closeModal } from '../router.js';
-import { daySlots, slotLabels, toMin, usesWindow, expediente, activeTurnos } from '../schedule.js';
+import { daySlots, slotLabels, toMin, usesWindow, expediente, activeTurnos, turnosDefinidos } from '../schedule.js';
 
 const app = () => $('app');
 
@@ -13,13 +13,16 @@ export function renderFormEditor() {
   const pac = editing ? getPac(editing.pacId) : getPac(params.pac || DB.pacs[0].id);
   window.__editorParams = editing ? JSON.parse(JSON.stringify(editing.params)) : [{ id: 'np' + Date.now(), type: 'numeric', name: '', unit: '', min: 0, max: 0, step: 0.1, seed: 0 }];
   window.__editorTimes = editing ? (editing.times && editing.times.length ? editing.times.slice() : (editing.due ? [editing.due] : [])) : [];
-  const exp = expediente(unitTurnos());
+  // conta nova ainda sem horário do expediente: nada de 06:00–14:00 inventado — a janela
+  // de "a cada X horas" fica em branco pra pessoa digitar (ou definir o expediente)
+  const def = turnosDefinidos(unitTurnos());
+  const exp = def ? expediente(unitTurnos()) : { start: '', end: '' };
   const es = (editing && editing.schedule) || {};
   const turnoIdx = activeTurnos(unitTurnos()).slice(0, 1).map(t => t.idx); // padrão: só o 1º turno
   const allTurnoIdx = activeTurnos(unitTurnos()).map(t => t.idx);
   window.__when = editing && editing.schedule
-    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), noTime: !!es.semHorario || (es.type === 'fixos' && !(es.times && es.times.length) && !(editing.times && editing.times.length) && !editing.due), start: es.start || exp.start, end: es.end || exp.end, useExp: !(es.start || es.end), winTurnos: new Set(['intervalo', 'vezes'].includes(es.type) && es.turnos && es.turnos.length ? es.turnos : allTurnoIdx), turnos: new Set(es.turnos && es.turnos.length ? es.turnos : turnoIdx), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
-    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), noTime: false, start: exp.start, end: exp.end, useExp: true, winTurnos: new Set(allTurnoIdx), turnos: new Set(turnoIdx), days: [], toleranceMin: 0 };
+    ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), noTime: !!es.semHorario || (es.type === 'fixos' && !(es.times && es.times.length) && !(editing.times && editing.times.length) && !editing.due), start: es.start || exp.start, end: es.end || exp.end, useExp: def && !(es.start || es.end), winTurnos: new Set(['intervalo', 'vezes'].includes(es.type) && es.turnos && es.turnos.length ? es.turnos : allTurnoIdx), turnos: new Set(es.turnos && es.turnos.length ? es.turnos : turnoIdx), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
+    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), noTime: false, start: exp.start, end: exp.end, useExp: def, winTurnos: new Set(allTurnoIdx), turnos: new Set(turnoIdx), days: [], toleranceMin: 0 };
 
   const inner = `<div class="px-4 py-4 space-y-4 pb-8">
     <div class="flex items-center justify-between">
@@ -124,6 +127,8 @@ export function renderWhen() {
       <span class="text-[13px] text-on-surface">vez(es) por</span>
       <select id="ed-period" class="${fieldCls} !font-sans !text-[13px] font-semibold"><option value="dia" ${w.period === 'dia' ? 'selected' : ''}>dia</option><option value="semana" ${w.period === 'semana' ? 'selected' : ''}>semana</option><option value="mes" ${w.period === 'mes' ? 'selected' : ''}>mês</option></select>
     </div>${w.period === 'dia' ? windowBlock(w) : ''}`;
+  } else if (w.type === 'momentos' && !turnosDefinidos(unitTurnos())) {
+    config = defineExpediente('Para usar início/fim do turno, defina antes o horário do expediente.');
   } else if (w.type === 'momentos') {
     const act = activeTurnos(unitTurnos()), multi = act.length > 1;
     const mo = (v, label) => { const on = w.moments.has(v); return `<button data-action="when-moment" data-m="${v}" class="tap flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold ${on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}">${icon(on ? 'check_circle' : 'radio_button_unchecked', 'text-[18px]')}${label}</button>`; };
@@ -200,10 +205,36 @@ export function syncWhen() {
   if (tol) w.toleranceMin = Math.max(0, parseInt(tol.value, 10) || 0);
 }
 
+// aviso com botão que abre a folha de turnos (a mesma da Equipe) sem sair do editor
+function defineExpediente(msg) {
+  return `<div class="flex items-center gap-3 bg-pend-bg rounded-lg p-3">
+    ${icon('schedule', 'text-pend-tx text-[20px] flex-none', true)}
+    <span class="flex-1 text-[12px] text-pend-tx">${msg}</span>
+    <button data-action="edit-turnos" class="tap flex-none bg-primary text-on-primary text-[12px] font-semibold px-3 py-2 rounded-lg">Definir</button>
+  </div>`;
+}
+
+// salvou os turnos pelo editor: passa a usar o expediente e redesenha só a frequência
+export function turnosChanged() {
+  const w = window.__when; if (!w) return;
+  const act = activeTurnos(unitTurnos()).map(t => t.idx);
+  if (!(w.start && w.end)) { const e = expediente(unitTurnos()); w.start = e.start; w.end = e.end; w.useExp = true; }
+  w.winTurnos = new Set(act); w.turnos = new Set(act.slice(0, 1));
+  renderWhen();
+}
+
 // janela do dia (início/fim) pra "a cada X horas" e "N vezes ao dia": é o que transforma
 // a frequência em horários concretos, cada um com seu próprio registro.
 function windowBlock(w) {
   const inp = (id, v) => `<input id="${id}" type="time" step="300" value="${esc(v)}" class="bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface border border-transparent focus:border-primary">`;
+  if (!turnosDefinidos(unitTurnos())) {
+    // sem expediente definido: só o horário próprio (Das … às …)
+    return `<div class="flex items-center gap-2 mt-3 flex-wrap">
+      <span class="text-[13px] text-on-surface">Das</span>${inp('ed-start', w.start)}
+      <span class="text-[13px] text-on-surface">às</span>${inp('ed-end', w.end)}
+    </div>
+    <p class="text-[12px] text-on-surface-variant mt-2">Ou <button data-action="edit-turnos" class="font-semibold text-primary underline">defina o horário do expediente</button> para usar os turnos.</p>`;
+  }
   const act = activeTurnos(unitTurnos()), exp = expediente(unitTurnos());
   const chipCls = on => `tap flex-1 flex flex-col items-center py-2 rounded-lg text-[12px] font-semibold ${on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'}`;
   // em quais turnos (ou, com a unidade num turno só, o expediente) — ou um horário próprio
@@ -230,6 +261,9 @@ function paintSlotPreview() {
   const el = $('ed-slot-preview'); if (!el) return;
   const cnt = $('ed-slot-count');
   const w = window.__when;
+  if (w.type !== 'momentos' && !w.useExp && (toMin(w.start) === null || toMin(w.end) === null)) {
+    el.innerHTML = `<span class="text-[12px] text-on-surface-variant">Informe o início e o fim para ver os horários.</span>`; if (cnt) cnt.textContent = ''; return;
+  }
   if (w.type !== 'momentos' && !w.useExp && !(toMin(w.end) > toMin(w.start))) {
     el.innerHTML = `<span class="text-[12px] text-error font-semibold">O fim precisa ser depois do início.</span>`; if (cnt) cnt.textContent = ''; return;
   }
@@ -485,21 +519,43 @@ export function syncEditorParams() {
   });
 }
 
+// o que falta preencher em cada parte do editor (null = ok) — usado ao salvar e pelo
+// tutorial, que só libera o "Próximo" quando a parte está completa
+export function titleProblem() { return $('ed-title') && $('ed-title').value.trim() ? null : 'Dê um nome à planilha.'; }
+export function whenProblem() {
+  syncWhen(); const w = window.__when;
+  if (w.type === 'fixos' && !w.noTime && !window.__editorTimes.filter(Boolean).length) return 'Adicione ao menos um horário (ou ligue “Sem horário específico”).';
+  if ((w.type === 'intervalo' || w.type === 'vezes') && usesWindow(whenSchedule(w)) && !w.useExp) {
+    if (toMin(w.start) === null || toMin(w.end) === null) return 'Informe o horário de início e de fim.';
+    if (!(toMin(w.end) > toMin(w.start))) return 'O horário de fim precisa ser depois do início.';
+  }
+  if (w.type === 'momentos') {
+    if (!turnosDefinidos(unitTurnos())) return 'Defina o horário do expediente para usar início/fim do turno.';
+    if (!w.moments.size) return 'Selecione ao menos um momento.';
+  }
+  return null;
+}
+export function paramsProblem() {
+  syncEditorParams();
+  const ps = window.__editorParams;
+  if (ps.some(p => !p.name.trim())) return 'Todo parâmetro precisa de um nome.';
+  const semFaixa = ps.find(p => p.type === 'numeric' && p.min === 0 && p.max === 0);
+  if (semFaixa) return `Informe a faixa aceitável (mínimo e máximo) de “${semFaixa.name}”.`;
+  const invertida = ps.find(p => p.type === 'numeric' && p.max < p.min);
+  if (invertida) return `Em “${invertida.name}”, o máximo precisa ser maior que o mínimo.`;
+  return null;
+}
+
 export async function saveFormEditor() {
-  syncEditorParams(); syncWhen();
+  const problem = titleProblem() || whenProblem() || paramsProblem();
+  if (problem) { toast(problem, 'err'); return; }
   const title = $('ed-title').value.trim();
-  if (!title) { toast('Informe o título do documento.', 'err'); return; }
-  if (window.__editorParams.some(p => !p.name.trim())) { toast('Todo parâmetro precisa de um nome.', 'err'); return; }
   const w = window.__when;
   const days = (w.days || []).slice().sort();
   let times = [], due = '', schedule;
   if (w.type === 'fixos' && w.noTime) { schedule = { type: 'fixos', times: [], semHorario: true, days }; }
-  else if (w.type === 'fixos') { times = window.__editorTimes.filter(Boolean).sort(); if (!times.length) { toast('Adicione ao menos um horário.', 'err'); return; } due = times[0] || ''; schedule = { type: 'fixos', times, days }; }
-  else if (w.type === 'intervalo' || w.type === 'vezes') {
-    schedule = { ...whenSchedule(w), days };
-    if (usesWindow(schedule) && !w.useExp && !(toMin(w.end) > toMin(w.start))) { toast('O horário de fim precisa ser depois do início.', 'err'); return; }
-  }
-  else if (w.type === 'momentos') { if (!w.moments.size) { toast('Selecione ao menos um momento.', 'err'); return; } schedule = { ...whenSchedule(w), days }; }
+  else if (w.type === 'fixos') { times = window.__editorTimes.filter(Boolean).sort(); due = times[0] || ''; schedule = { type: 'fixos', times, days }; }
+  else if (w.type === 'intervalo' || w.type === 'vezes' || w.type === 'momentos') { schedule = { ...whenSchedule(w), days }; }
   else { schedule = { type: 'demanda' }; }
 
   const editing = params.form ? getForm(params.form) : null;

@@ -14,6 +14,12 @@ export const DEFAULT_TURNOS = [
   { inicio: '06:00', fim: '14:00', ativo: true },
   { inicio: '14:00', fim: '22:00', ativo: true },
 ];
+// conta nova: um turno só e sem horário — não dá pra adivinhar o expediente da fábrica,
+// o gestor define em Equipe › Turnos. (Unidade antiga sem nada salvo = null = DEFAULT_TURNOS.)
+export const TURNOS_A_DEFINIR = [
+  { inicio: '', fim: '', ativo: true },
+  { inicio: '', fim: '', ativo: false },
+];
 const MAX_SLOTS = 96; // teto de segurança (ex.: "a cada 1 minuto")
 
 export function toMin(hhmm) {
@@ -32,6 +38,12 @@ export function activeTurnos(turnos) {
     .map((t, idx) => ({ ...t, idx }))
     .filter(t => t.ativo !== false && toMin(t.inicio) !== null && toMin(t.fim) > toMin(t.inicio));
   return list.length ? list : DEFAULT_TURNOS.slice(0, 1).map(t => ({ ...t, idx: 0 }));
+}
+
+// o horário do expediente já foi definido? (null = unidade antiga, usa o padrão)
+export function turnosDefinidos(turnos) {
+  if (turnos == null) return true;
+  return Array.isArray(turnos) && turnos.some(t => t.ativo !== false && toMin(t.inicio) !== null && toMin(t.fim) > toMin(t.inicio));
 }
 
 export function expediente(turnos) {

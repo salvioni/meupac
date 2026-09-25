@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { validTz } from '../tz.js';
+import { checkCnpjMunicipio, formatCnpj } from '../../../frontend/src/br.js';
+import { TURNOS_A_DEFINIR } from '../../../frontend/src/schedule.js';
 import { db, seedPacsFor } from '../db.js';
 import { signToken, publicUser } from '../auth.js';
 import { authenticate } from '../middleware.js';
@@ -15,6 +17,7 @@ authRouter.post('/signup', (req, res) => {
   if (!adminName || !String(adminName).trim()) return res.status(400).json({ error: 'Informe seu nome.' });
   if (!username || !String(username).trim()) return res.status(400).json({ error: 'Escolha um usuário de login.' });
   if (!password || password.length < 6) return res.status(400).json({ error: 'A senha precisa ter pelo menos 6 caracteres.' });
+  const brErr = checkCnpjMunicipio({ cnpj, municipio }); if (brErr) return res.status(400).json({ error: brErr });
 
   const uname = String(username).toLowerCase().trim();
   if (db.prepare('SELECT id FROM users WHERE username = ?').get(uname)) {
@@ -23,10 +26,12 @@ authRouter.post('/signup', (req, res) => {
 
   const unidadeId = 'un' + Date.now() + Math.random().toString(36).slice(2, 7);
   db.prepare(`INSERT INTO unidade (id,razao_social,marca,cnpj,sif,endereco,municipio,rt_nome,rt_registro,logo) VALUES (?,?,?,?,?,?,?,?,?,NULL)`)
-    .run(unidadeId, razaoSocial.trim(), '', String(cnpj || '').trim(), String(sif || '').trim(), String(endereco || '').trim(), String(municipio || '').trim(), adminName.trim(), String(rtRegistro || '').trim());
+    .run(unidadeId, razaoSocial.trim(), '', formatCnpj(cnpj), String(sif || '').trim(), String(endereco || '').trim(), String(municipio || '').trim(), adminName.trim(), String(rtRegistro || '').trim());
 
   // fuso detectado no navegador de quem cadastra (a fábrica); dá pra trocar em Dados da unidade
   if (validTz(timezone)) db.prepare('UPDATE unidade SET timezone = ? WHERE id = ?').run(timezone, unidadeId);
+  // um turno só, sem horário: quem sabe o expediente é o gestor (Equipe › Turnos)
+  db.prepare('UPDATE unidade SET turnos_json = ? WHERE id = ?').run(JSON.stringify(TURNOS_A_DEFINIR), unidadeId);
   seedPacsFor(unidadeId);
 
   const userId = 'u' + Date.now() + Math.random().toString(36).slice(2, 6);

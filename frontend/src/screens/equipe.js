@@ -1,6 +1,6 @@
 import { $, esc, icon, toast } from '../helpers.js';
-import { DB, currentUser, isTitular, getPac, pacActive, dueText, plCode, unitTurnos, visibleToOperator } from '../state.js';
-import { activeTurnos, DEFAULT_TURNOS } from '../schedule.js';
+import { DB, currentUser, screen, isTitular, getPac, pacActive, dueText, plCode, unitTurnos, visibleToOperator } from '../state.js';
+import { activeTurnos, DEFAULT_TURNOS, turnosDefinidos } from '../schedule.js';
 
 // nome do turno de um operador (só faz sentido com 2 turnos ligados na unidade)
 function turnoName(t) {
@@ -12,6 +12,7 @@ import { shell, profileTrigger } from '../ui.js';
 import { GE_NAV } from '../config.js';
 import * as api from '../api.js';
 import { closeModal, rerender } from '../router.js';
+import { turnosChanged } from './formEditor.js';
 
 const app = () => $('app');
 const avatarChip = (u) => `<span data-uid="${u.id}" title="${esc(u.name)}" class="w-5 h-5 rounded-full flex items-center justify-center font-mono text-[8px] font-bold flex-none" style="background:${u.color || '#dfe9fb'};color:${u.ink || '#0f2642'}">${u.initials || '·'}</span>`;
@@ -302,6 +303,14 @@ export async function deleteMember(id) {
 // Ficam aqui (e não em Dados da unidade) porque andam junto com a escala: quem monta
 // a equipe define os horários dos turnos e designa cada operador a um deles.
 function turnosCard(team) {
+  if (!turnosDefinidos(unitTurnos())) {
+    return `<div class="bg-pend-bg rounded-xl p-3.5 flex items-center gap-3">
+      ${icon('schedule', 'text-pend-tx text-[22px] flex-none', true)}
+      <div class="flex-1 min-w-0"><div class="text-[13px] font-semibold text-pend-tx">Horário do expediente não definido</div>
+      <div class="text-[12px] text-pend-tx opacity-90">Usado em “a cada X horas” e “início/fim do turno”.</div></div>
+      <button data-action="edit-turnos" class="tap flex-none bg-primary text-on-primary text-[12px] font-semibold px-3 py-2 rounded-lg">Definir</button>
+    </div>`;
+  }
   const act = activeTurnos(unitTurnos());
   const ops = team.filter(t => t.role === 'operador');
   const count = idx => ops.filter(t => t.turnoIdx === idx).length;
@@ -333,7 +342,8 @@ function turnoRow(i, t, fixed) {
 
 export function turnosSheet() {
   const u = DB.unidade || {};
-  const turnos = [0, 1].map(i => ({ ...DEFAULT_TURNOS[i], ...((u.turnos || [])[i] || {}) }));
+  // unidade antiga sem nada salvo mostra o padrão; conta nova vem com o 1º turno vazio e o 2º desligado
+  const turnos = [0, 1].map(i => u.turnos ? { inicio: '', fim: '', ativo: i === 0, ...(u.turnos[i] || {}) } : DEFAULT_TURNOS[i]);
   $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-center justify-center p-4" data-close-modal>
     <div class="absolute inset-0 bg-black/40" data-close-modal></div>
     <div class="relative bg-surface-container-lowest rounded-2xl w-full max-w-[380px] shadow-2xl p-4">
@@ -355,7 +365,12 @@ export async function saveTurnos() {
     { inicio: $('uni-t0-ini').value, fim: $('uni-t0-fim').value, ativo: true },
     { inicio: $('uni-t1-ini').value, fim: $('uni-t1-fim').value, ativo: $('uni-t1-on').classList.contains('on') },
   ];
-  try { await api.saveTurnos(turnos); await api.refreshState(); closeModal(); rerender(); toast('Turnos salvos.'); }
+  try {
+    await api.saveTurnos(turnos); await api.refreshState(); closeModal();
+    // no editor de planilha não re-renderiza a tela (perderia o que já foi digitado)
+    if (screen === 'ge_form_editor') turnosChanged(); else rerender();
+    toast('Turnos salvos.');
+  }
   catch (e) { toast(e.message || 'Não foi possível salvar os turnos.', 'err'); }
 }
 
