@@ -167,13 +167,15 @@ export function renderEditSheet() {
       <div class="divide-y divide-outline-variant/30 pl-1">
         ${fs.map(f => { const on = e.owned.has(f.id);
           const linked = (f.operatorIds || []).map(id => DB.team.find(m => m.id === id)).filter(Boolean);
+          const aberta = !on && !othersOn(f, e.id).length;
           return `<button data-action="edit-form-toggle" data-form="${f.id}" class="tap w-full flex items-center gap-3 py-2.5 px-1 text-left">
             <div class="flex-1 min-w-0">
               <div class="text-[13px] font-medium text-on-surface truncate">${esc(f.title)}</div>
               <div class="mono text-[10px] text-on-surface-variant truncate">${plCode(f)} · ${esc(dueText(f))}</div>
               <div class="linked-avatars flex items-center gap-1 mt-1.5 ${linked.length ? '' : 'hidden'}">${linked.map(u => avatarChip(u)).join('')}</div>
+              <span class="open-tag ${aberta ? 'inline-flex' : 'hidden'} items-center gap-1 mt-1.5 mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">${icon('groups', 'text-[12px]')} Liberada para todos</span>
             </div>
-            <span class="material-symbols-outlined ${on ? 'ms-fill text-secondary' : 'text-outline-variant'} text-[24px]">${on ? 'check_circle' : 'radio_button_unchecked'}</span>
+            <span class="access-chk material-symbols-outlined ${on ? 'ms-fill text-secondary' : 'text-outline-variant'} text-[24px]">${on ? 'check_circle' : 'radio_button_unchecked'}</span>
           </button>`; }).join('')}
       </div>
     </div>`;
@@ -197,9 +199,10 @@ export function renderEditSheet() {
       <div class="flex gap-2">${roleBtn('operador', 'Operador', 'engineering')}${currentUser.titular ? roleBtn('gerente', 'Gestor', 'shield_person') : ''}</div>
       ${currentUser.titular ? '' : `<p class="mono text-[10px] text-on-surface-variant mt-1">Somente o titular pode promover alguém a gestor.</p>`}
       ${e.role === 'operador'
-        ? `<div class="mt-4 flex items-start gap-2 bg-surface-container rounded-lg p-3 text-on-surface-variant text-[12px]">${icon('engineering', 'text-primary text-[18px] flex-none', true)}<span>O operador preenche e assina digitalmente as planilhas do seu turno. Planilha sem ninguém marcado fica liberada para todos os operadores; marque abaixo para restringir uma planilha a quem você escolher. Não acessa o painel de gestão, o histórico da fábrica nem assina planilhas de outros.</span></div>
+        ? `<div class="mt-4 flex items-start gap-2 bg-surface-container rounded-lg p-3 text-on-surface-variant text-[12px]">${icon('engineering', 'text-primary text-[18px] flex-none', true)}<span>O operador preenche e assina digitalmente as planilhas do seu turno. Não acessa o painel de gestão, o histórico da fábrica nem assina planilhas de outros.</span></div>
            ${turnoSection}
-           <p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mt-4 mb-1">Restringir planilhas · <span id="owned-count">${e.owned.size}</span></p>${formsSection}`
+           <p class="mono text-[10px] uppercase tracking-widest text-on-surface-variant mt-4">Planilhas que ele preenche · <span id="owned-count">${seesText(e)}</span></p>
+           <p class="text-[11px] text-on-surface-variant mt-0.5">Marque as dele. Sem ninguém marcado, a planilha fica liberada para todos.</p>${formsSection}`
         : `<div class="mt-4 flex items-start gap-2 bg-inverse-primary rounded-lg p-3 text-primary text-[12px]">${icon('verified_user', 'text-[18px] flex-none', true)}<span>O gestor valida e assina as planilhas, acompanha o painel e o histórico de toda a unidade e gerencia os operadores. Não preenche planilhas — isso é do operador.</span></div>`}
       <button data-action="save-member" class="tap w-full mt-4 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px]">Salvar acessos</button>
     </div></div>`;
@@ -219,10 +222,10 @@ export function toggleFormAccess(formId) {
   nowOn ? e.owned.add(formId) : e.owned.delete(formId);
   if (!btn) { renderEditSheet(); return; }
 
-  const chk = btn.querySelector('.material-symbols-outlined');
+  const chk = btn.querySelector('.access-chk');
   if (chk) {
     chk.textContent = nowOn ? 'check_circle' : 'radio_button_unchecked';
-    chk.className = `material-symbols-outlined ${nowOn ? 'ms-fill text-secondary' : 'text-outline-variant'} text-[24px]`;
+    chk.className = `access-chk material-symbols-outlined ${nowOn ? 'ms-fill text-secondary' : 'text-outline-variant'} text-[24px]`;
   }
 
   const t = DB.team.find(x => x.id === e.id);
@@ -234,8 +237,20 @@ export function toggleFormAccess(formId) {
     row.classList.toggle('hidden', !row.children.length);
   }
 
+  const tag = btn.querySelector('.open-tag');
+  if (tag) { const aberta = !nowOn && !othersOn(getFormById(formId), e.id).length; tag.classList.toggle('hidden', !aberta); tag.classList.toggle('inline-flex', aberta); }
+
   const counter = document.getElementById('owned-count');
-  if (counter) counter.textContent = e.owned.size;
+  if (counter) counter.textContent = seesText(e);
+}
+
+// outros operadores marcados na planilha (sem contar quem está sendo editado)
+const getFormById = id => DB.forms.find(f => f.id === id);
+const othersOn = (f, uid) => (f && f.operatorIds ? f.operatorIds : []).filter(id => id !== uid);
+// ele vê a planilha se está marcado nela ou se ninguém mais está (liberada para todos)
+function seesText(e) {
+  const n = DB.forms.filter(f => e.owned.has(f.id) || !othersOn(f, e.id).length).length;
+  return `vê ${n} de ${DB.forms.length}`;
 }
 
 export async function saveMember() {
