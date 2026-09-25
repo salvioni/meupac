@@ -12,6 +12,7 @@ export function renderFormEditor() {
   const editing = params.form ? getForm(params.form) : null;
   const pac = editing ? getPac(editing.pacId) : getPac(params.pac || DB.pacs[0].id);
   window.__editorParams = editing ? JSON.parse(JSON.stringify(editing.params)) : [{ id: 'np' + Date.now(), type: 'numeric', name: '', unit: '', min: 0, max: 0, step: 0.1, seed: 0 }];
+  typingIdx = null;
   window.__editorTimes = editing ? (editing.times && editing.times.length ? editing.times.slice() : (editing.due ? [editing.due] : [])) : [];
   // conta nova ainda sem horário do expediente: nada de 06:00–14:00 inventado — a janela
   // de "a cada X horas" fica em branco pra pessoa digitar (ou definir o expediente)
@@ -275,52 +276,118 @@ function paintSlotPreview() {
   if (cnt) cnt.textContent = slots.length ? `${slots.length} por dia` : '';
 }
 
-// horários fixos: cada um é um chip grande ("08:00 ×"); adicionar/editar abre uma folha
-// com grade de horas e de minutos — um toque em cada, fácil de acertar no celular
-// (antes eram dois <select> minúsculos lado a lado).
+// horários fixos: cada um é um chip ("08:00 ×"). Tocar/clicar num chip edita; o X remove.
+// No computador (mouse) digita-se a hora num campo com máscara ("0800" → 08:00, Enter);
+// no celular (toque) abre uma folha com roletas de hora e minuto, como o despertador.
+const isTouch = () => !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+let typingIdx = null; // computador: posição sendo digitada (-1 = novo), null = nenhuma
+
+export function addTime() { if (isTouch()) openTimePicker(-1); else { typingIdx = -1; renderEditorTimes(); } }
+export function editTime(idx) { if (isTouch()) openTimePicker(idx); else { typingIdx = idx; renderEditorTimes(); } }
+
 export function renderEditorTimes() {
   const wrap = $('ed-times'); if (!wrap) return;
   window.__editorTimes = [...new Set(window.__editorTimes.filter(Boolean))].sort();
-  const addChip = `<button data-action="add-time" class="tap inline-flex items-center gap-1.5 bg-surface-container-low rounded-lg px-3.5 h-11 border border-dashed border-outline-variant text-primary font-semibold text-[14px]">${icon('add', 'text-[20px]')} Adicionar horário</button>`;
-  wrap.innerHTML = window.__editorTimes.map((t, i) => `<span class="inline-flex items-center bg-surface-container-low rounded-lg h-11 overflow-hidden">
+  const typing = `<span class="inline-flex items-center gap-1.5 bg-surface-container-lowest rounded-lg h-11 px-3 border-2 border-primary">
+      ${icon('schedule', 'text-primary text-[18px]')}
+      <input id="ed-time-type" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="--:--" class="w-[64px] bg-transparent mono text-[16px] font-semibold text-on-surface placeholder:text-outline-variant">
+    </span>`;
+  const chip = (t, i) => i === typingIdx ? typing : `<span class="inline-flex items-center bg-surface-container-low rounded-lg h-11 overflow-hidden">
       <button data-action="edit-time" data-idx="${i}" class="tap h-full flex items-center gap-1.5 pl-3 pr-1.5">${icon('schedule', 'text-on-surface-variant text-[18px]')}<span class="mono text-[16px] font-semibold text-on-surface">${esc(t)}</span></button>
       <button data-action="del-time" data-idx="${i}" aria-label="Remover ${esc(t)}" class="tap h-full w-10 flex items-center justify-center text-on-surface-variant">${icon('close', 'text-[20px]')}</button>
-    </span>`).join('') + addChip;
+    </span>`;
+  const addChip = typingIdx === -1 ? typing : `<button data-action="add-time" class="tap inline-flex items-center gap-1.5 bg-surface-container-low rounded-lg px-3.5 h-11 border border-dashed border-outline-variant text-primary font-semibold text-[14px]">${icon('add', 'text-[20px]')} Adicionar horário</button>`;
+  wrap.innerHTML = window.__editorTimes.map(chip).join('') + addChip
+    + (typingIdx !== null ? `<div class="w-full text-[11px] text-on-surface-variant">Digite a hora (ex.: 0800) e aperte Enter · Esc cancela</div>` : '');
+  const inp = $('ed-time-type');
+  if (inp) {
+    if (typingIdx >= 0) inp.value = window.__editorTimes[typingIdx];
+    inp.focus(); inp.select();
+    inp.oninput = () => { inp.value = maskTime(inp.value); };
+    inp.onkeydown = ev => {
+      if (ev.key === 'Enter') { ev.preventDefault(); commitTyped(inp.value, true); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); inp.onblur = null; typingIdx = null; renderEditorTimes(); }
+    };
+    inp.onblur = () => { if (typingIdx !== null) commitTyped(inp.value, false); };
+  }
 }
 
-// idx = -1 adiciona; senão edita o horário daquela posição
+// "8" → "08:", "0800" → "08:00", "1730" → "17:30": só dígitos, com os dois-pontos no lugar
+function maskTime(v) {
+  let d = String(v).replace(/\D/g, '');
+  if (d.length === 1 && +d > 2) d = '0' + d; // 3..9 só pode ser 03..09
+  d = d.slice(0, 4);
+  return d.length > 2 ? d.slice(0, 2) + ':' + d.slice(2) : d.length === 2 ? d + ':' : d;
+}
+
+function commitTyped(v, keepGoing) {
+  const idx = typingIdx;
+  const el = $('ed-time-type'); if (el) el.onblur = null; // redesenhar tira o campo da tela: não confirma de novo
+  const m = /^(\d{2}):?(\d{2})$/.exec(v.trim());
+  if (!v.trim()) { typingIdx = null; renderEditorTimes(); return; }
+  if (!m || +m[1] > 23 || +m[2] > 59) { toast('Horário inválido — use de 00:00 a 23:59.', 'err'); typingIdx = null; renderEditorTimes(); return; }
+  const val = m[1] + ':' + m[2];
+  if (window.__editorTimes.some((t, i) => t === val && i !== idx)) { toast(`${val} já está na lista.`, 'err'); typingIdx = null; renderEditorTimes(); return; }
+  if (idx >= 0) window.__editorTimes[idx] = val; else window.__editorTimes.push(val);
+  // Enter num horário novo já abre o próximo campo, pra digitar vários em sequência
+  typingIdx = keepGoing && idx === -1 ? -1 : null;
+  renderEditorTimes();
+}
+
+// celular: roletas de hora (00–23) e minuto (00–59). Estilos inline de propósito — a
+// posição da roleta é calculada logo depois de desenhar, antes do Tailwind do CDN
+// aplicar as classes.
+const ITEM_H = 44;
 export function openTimePicker(idx = -1) {
   const cur = idx >= 0 ? window.__editorTimes[idx] : '';
-  const pick = { h: cur ? +cur.slice(0, 2) : null, m: cur ? +cur.slice(3, 5) : 0 };
-  const btnCls = on => `tap h-11 rounded-lg mono text-[15px] font-semibold ${on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface'}`;
-  const paint = () => {
-    const val = pick.h === null ? null : String(pick.h).padStart(2, '0') + ':' + String(pick.m).padStart(2, '0');
-    const dup = val && window.__editorTimes.some((t, i) => t === val && i !== idx);
-    $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-end sm:items-center justify-center" data-close-modal>
+  let h = cur ? +cur.slice(0, 2) : 8, m = cur ? +cur.slice(3, 5) : 0;
+  const pad = n => String(n).padStart(2, '0');
+  const col = (id, n) => `<div id="${id}" style="height:${ITEM_H * 5}px;overflow-y:scroll;scroll-snap-type:y mandatory;width:84px;position:relative;z-index:1;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+      <div style="height:${ITEM_H * 2}px"></div>
+      ${Array.from({ length: n }, (_, i) => `<div data-v="${i}" style="height:${ITEM_H}px;line-height:${ITEM_H}px;text-align:center;scroll-snap-align:center;font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:600;color:#121c29">${pad(i)}</div>`).join('')}
+      <div style="height:${ITEM_H * 2}px"></div>
+    </div>`;
+  $('modal-root').innerHTML = `<div class="fixed inset-0 z-50 fade-in flex items-end sm:items-center justify-center" data-close-modal>
     <div class="absolute inset-0 bg-black/40" data-close-modal></div>
-    <div class="relative bg-surface-container-lowest rounded-t-2xl sm:rounded-2xl w-full sm:max-w-[420px] max-h-[90dvh] overflow-y-auto scroll-area shadow-2xl p-4" style="padding-bottom:max(16px, env(safe-area-inset-bottom))">
-      <div class="flex items-center justify-between pb-3 border-b border-outline-variant/40">
-        <div class="font-semibold text-on-surface text-[16px]">${idx >= 0 ? 'Alterar horário' : 'Adicionar horário'}</div>
-        <div class="mono text-[22px] font-bold ${val ? 'text-primary' : 'text-outline-variant'}">${val || '--:--'}</div>
+    <div class="relative bg-surface-container-lowest rounded-t-2xl sm:rounded-2xl w-full sm:max-w-[380px] shadow-2xl p-4" style="padding-bottom:max(16px, env(safe-area-inset-bottom))">
+      <div class="font-semibold text-on-surface text-[16px] pb-3 border-b border-outline-variant/40">${idx >= 0 ? 'Alterar horário' : 'Adicionar horário'}</div>
+      <div style="position:relative;display:flex;justify-content:center;align-items:center;gap:8px;margin:12px 0">
+        <div style="position:absolute;left:16px;right:16px;top:50%;height:${ITEM_H}px;margin-top:-${ITEM_H / 2}px;background:#e5eeff;border-radius:12px"></div>
+        ${col('wheel-h', 24)}
+        <div style="position:relative;z-index:1;font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:#121c29">:</div>
+        ${col('wheel-m', 60)}
+        <div style="position:absolute;left:0;right:0;top:0;height:${ITEM_H * 2}px;background:linear-gradient(#fff,rgba(255,255,255,.4));pointer-events:none;z-index:2"></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:${ITEM_H * 2}px;background:linear-gradient(rgba(255,255,255,.4),#fff);pointer-events:none;z-index:2"></div>
       </div>
-      <p class="mono text-[10px] uppercase tracking-wide text-on-surface-variant mt-3 mb-2">Hora</p>
-      <div class="grid grid-cols-6 gap-1.5">${Array.from({ length: 24 }, (_, h) => `<button data-pick-h="${h}" class="${btnCls(pick.h === h)}">${String(h).padStart(2, '0')}</button>`).join('')}</div>
-      <p class="mono text-[10px] uppercase tracking-wide text-on-surface-variant mt-4 mb-2">Minuto</p>
-      <div class="grid grid-cols-6 gap-1.5">${Array.from({ length: 12 }, (_, k) => k * 5).map(m => `<button data-pick-m="${m}" class="${btnCls(pick.m === m)}">${String(m).padStart(2, '0')}</button>`).join('')}</div>
-      ${dup ? `<p class="text-[12px] text-error font-semibold mt-3">${val} já está na lista.</p>` : ''}
-      <div class="flex gap-2 mt-4">
+      <div id="wheel-dup" class="text-[12px] text-error font-semibold text-center hidden"></div>
+      <div class="flex gap-2 mt-2">
         <button data-action="close-x" class="tap flex-1 bg-surface-container text-on-surface rounded-xl py-3.5 font-semibold text-[14px]">Cancelar</button>
-        <button data-time-ok ${!val || dup ? 'disabled' : ''} class="tap flex-1 rounded-xl py-3.5 font-semibold text-[14px] ${!val || dup ? 'bg-surface-container text-outline-variant' : 'bg-primary text-on-primary'}">${val ? (idx >= 0 ? `Salvar ${val}` : `Adicionar ${val}`) : 'Escolha a hora'}</button>
+        <button id="wheel-ok" class="tap flex-1 bg-primary text-on-primary rounded-xl py-3.5 font-semibold text-[14px]"></button>
       </div>
     </div></div>`;
-    document.querySelectorAll('[data-pick-h]').forEach(b => b.onclick = () => { pick.h = +b.dataset.pickH; pick.m = 0; paint(); }); // hora nova começa em :00
-    document.querySelectorAll('[data-pick-m]').forEach(b => b.onclick = () => { pick.m = +b.dataset.pickM; paint(); });
-    const ok = document.querySelector('[data-time-ok]');
-    if (ok) ok.onclick = () => {
-      if (!val || dup) return;
-      if (idx >= 0) window.__editorTimes[idx] = val; else window.__editorTimes.push(val);
-      closeModal(); renderEditorTimes();
-    };
+  const wh = $('wheel-h'), wm = $('wheel-m'), ok = $('wheel-ok'), dupEl = $('wheel-dup');
+  const val = () => pad(h) + ':' + pad(m);
+  const paint = () => {
+    const dup = window.__editorTimes.some((t, i) => t === val() && i !== idx);
+    ok.textContent = (idx >= 0 ? 'Salvar ' : 'Adicionar ') + val();
+    ok.disabled = dup; ok.style.opacity = dup ? '.4' : '1';
+    dupEl.textContent = dup ? `${val()} já está na lista.` : ''; dupEl.classList.toggle('hidden', !dup);
+  };
+  wh.scrollTop = h * ITEM_H; wm.scrollTop = m * ITEM_H;
+  let lastH = h;
+  wh.onscroll = () => {
+    h = Math.min(23, Math.max(0, Math.round(wh.scrollTop / ITEM_H)));
+    // hora nova começa em :00 (girar a hora zera o minuto)
+    if (h !== lastH) { lastH = h; if (m !== 0) { m = 0; wm.scrollTo({ top: 0, behavior: 'smooth' }); } }
+    paint();
+  };
+  wm.onscroll = () => { m = Math.min(59, Math.max(0, Math.round(wm.scrollTop / ITEM_H))); paint(); };
+  // tocar num número também leva a roleta até ele
+  [wh, wm].forEach(w => w.onclick = ev => { const it = ev.target.closest('[data-v]'); if (it) w.scrollTo({ top: +it.dataset.v * ITEM_H, behavior: 'smooth' }); });
+  ok.onclick = () => {
+    if (ok.disabled) return;
+    if (idx >= 0) window.__editorTimes[idx] = val(); else window.__editorTimes.push(val());
+    closeModal(); renderEditorTimes();
   };
   paint();
 }

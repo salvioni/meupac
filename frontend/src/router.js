@@ -6,7 +6,7 @@ import { renderOpPac, renderPreencher, renderDetalhe, submitFill, exportRecordPd
 import { renderOpHist, renderGeHist, exportSheet, runExport } from './screens/historico.js';
 import { renderPainel, sign, signAll } from './screens/painel.js';
 import { renderForms, renderPacForms, togglePacActive, toggleFormActive } from './screens/pacs.js';
-import { renderFormEditor, saveFormEditor, syncEditorParams, renderEditorTimes, openTimePicker, syncWhen, renderWhen, confirmDeleteForm, deleteFormConfirmed, openAddParam } from './screens/formEditor.js';
+import { renderFormEditor, saveFormEditor, syncEditorParams, renderEditorTimes, addTime, editTime, syncWhen, renderWhen, confirmDeleteForm, deleteFormConfirmed, openAddParam } from './screens/formEditor.js';
 import { renderEquipe, inviteSheet, confirmInvite, editMemberSheet, renderEditSheet, toggleFormAccess, saveMember, confirmResetPassword, resetMemberPassword, confirmDelete, deleteMember, turnosSheet, saveTurnos, verifyAudit } from './screens/equipe.js';
 import { profileMenu, changePasswordSheet, saveNewPassword, unidadeSheet, saveUnidade } from './screens/perfil.js';
 import { toast } from './helpers.js';
@@ -122,8 +122,8 @@ export function initEventDelegation() {
       case 'new-form': navigate('ge_form_editor', { pac: el.dataset.pac }); break;
       case 'config-form': navigate('ge_form_editor', { form: el.dataset.form }); break;
       case 'add-param': syncEditorParams(); openAddParam(); break;
-      case 'add-time': openTimePicker(-1); break;
-      case 'edit-time': openTimePicker(+el.dataset.idx); break;
+      case 'add-time': addTime(); break;
+      case 'edit-time': editTime(+el.dataset.idx); break;
       case 'del-time': window.__editorTimes.splice(+el.dataset.idx, 1); renderEditorTimes(); break;
       case 'when-type': syncWhen(); window.__when.type = el.dataset.type; renderWhen(); break;
       case 'when-moment': { syncWhen(); const s = window.__when.moments; const mm = el.dataset.m; s.has(mm) ? s.delete(mm) : s.add(mm); renderWhen(); break; }
