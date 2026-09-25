@@ -23,14 +23,16 @@ export function renderFormEditor() {
   const allTurnoIdx = activeTurnos(unitTurnos()).map(t => t.idx);
   window.__when = editing && editing.schedule
     ? { type: editing.schedule.type || 'fixos', every: editing.schedule.every || 2, unit: editing.schedule.unit || 'horas', count: editing.schedule.count || 2, period: editing.schedule.period || 'dia', moments: new Set(editing.schedule.moments || []), noTime: !!es.semHorario || (es.type === 'fixos' && !(es.times && es.times.length) && !(editing.times && editing.times.length) && !editing.due), start: es.start || exp.start, end: es.end || exp.end, useExp: def && !(es.start || es.end), winTurnos: new Set(['intervalo', 'vezes'].includes(es.type) && es.turnos && es.turnos.length ? es.turnos : allTurnoIdx), turnos: new Set(es.turnos && es.turnos.length ? es.turnos : turnoIdx), days: (editing.schedule.days || editing.days || []).slice(), toleranceMin: editing.toleranceMin || 0 }
-    : { type: 'fixos', every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), noTime: false, start: exp.start, end: exp.end, useExp: def, winTurnos: new Set(allTurnoIdx), turnos: new Set(turnoIdx), days: [], toleranceMin: 0 };
+    // planilha nova: nada pré-escolhido (tipo, dias, quem preenche) — cada escolha é consciente
+    : { type: null, every: 2, unit: 'horas', count: 2, period: 'dia', moments: new Set(), noTime: false, start: exp.start, end: exp.end, useExp: def, winTurnos: new Set(allTurnoIdx), turnos: new Set(turnoIdx), days: null, toleranceMin: 0 };
 
   const inner = `<div class="px-4 py-4 space-y-4 pb-8">
     <div class="flex items-center justify-between">
       <button data-action="nav" data-nav="ge_forms" class="tap inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary">${icon('arrow_back', 'text-[18px]')} Voltar para PACs</button>
       ${editing ? `<button data-action="delete-form" data-form="${editing.id}" class="tap w-9 h-9 rounded-lg flex items-center justify-center text-error">${icon('delete', 'text-[20px]')}</button>` : ''}
     </div>
-    <h1 class="text-[22px] font-bold text-on-surface leading-tight">${editing ? 'Configurar Planilha' : 'Nova Planilha'}</h1>
+    <div><h1 class="text-[22px] font-bold text-on-surface leading-tight">${editing ? 'Configurar Planilha' : 'Nova Planilha'}</h1>
+    <p class="text-[12px] text-on-surface-variant mt-0.5"><span class="text-error">*</span> obrigatório</p></div>
 
     <section class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl overflow-hidden">
       <button type="button" data-toggle-section="ident" class="tap w-full flex items-center justify-between gap-2 p-4">
@@ -38,7 +40,7 @@ export function renderFormEditor() {
         <span class="material-symbols-outlined text-on-surface-variant text-[20px]" data-chevron>expand_less</span>
       </button>
       <div class="px-4 pb-4 space-y-3" data-section-body="ident">
-        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Título do Documento</label>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Título do Documento${REQ}</label>
         <input id="ed-title" value="${editing ? esc(editing.title) : ''}" placeholder="Ex: Controle Diário de Cloração" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] border border-transparent focus:border-primary"></div>
         <div class="bg-surface-container-low rounded-lg p-3"><div class="mono text-[10px] uppercase text-on-surface-variant">PAC Vinculado</div><div class="text-[13px] font-bold text-on-surface">${pac.code} · ${esc(pac.name)}</div></div>
         <div class="flex items-center justify-between bg-surface-container-low rounded-lg px-3 py-2.5">
@@ -55,8 +57,8 @@ export function renderFormEditor() {
       </button>
       <div class="px-4 pb-4" data-section-body="freq">
         <div id="ed-when-wrap"></div>
-        <div class="mt-4 pt-4 border-t border-outline-variant/40">${lbl('Quem preenche')}
-          <div class="grid grid-cols-2 gap-2">
+        <div class="mt-4 pt-4 border-t border-outline-variant/40">${lbl('Quem preenche' + REQ)}
+          <div id="ed-fill" class="grid grid-cols-2 gap-2">
             <button data-fill-mode="um" class="fill-mode-btn tap rounded-lg px-3 py-2 text-left"><div class="text-[13px] font-semibold">Basta um</div><div class="text-[11px] opacity-80">Ex.: cloro, temperatura</div></button>
             <button data-fill-mode="cada" class="fill-mode-btn tap rounded-lg px-3 py-2 text-left"><div class="text-[13px] font-semibold">Cada pessoa</div><div class="text-[11px] opacity-80">Ex.: saúde, uniforme</div></button>
           </div>
@@ -83,7 +85,7 @@ export function renderFormEditor() {
   renderEditorParams();
   // quem preenche: registro do processo/local (basta um; mais gente = cobertura) ou
   // registro sobre a própria pessoa (cada um envia o seu)
-  window.__fillMode = editing && editing.fillMode === 'cada' ? 'cada' : 'um';
+  window.__fillMode = editing ? (editing.fillMode === 'cada' ? 'cada' : 'um') : null;
   const paintFill = () => {
     document.querySelectorAll('.fill-mode-btn').forEach(b => b.className = 'fill-mode-btn tap rounded-lg px-3 py-2 text-left ' + (b.dataset.fillMode === window.__fillMode ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'));
   };
@@ -101,6 +103,8 @@ export function renderFormEditor() {
 }
 
 // rótulo de bloco (mesmo estilo em toda a seção) e divisória entre blocos
+// * vermelho nos campos obrigatórios
+const REQ = '<span class="text-error"> *</span>';
 const lbl = (t, right = '') => `<div class="flex items-center justify-between min-h-[20px] mb-2"><span class="mono text-[10px] uppercase tracking-wide text-on-surface-variant">${t}</span>${right}</div>`;
 const group = inner => `<div class="mt-4 pt-4 border-t border-outline-variant/40">${inner}</div>`;
 const fieldCls = 'bg-surface-container-low rounded-lg px-3 py-2 mono text-[15px] text-on-surface border border-transparent focus:border-primary';
@@ -113,7 +117,9 @@ export function renderWhen() {
   const toggleRow = (id, on, text) => `<div class="flex items-center gap-3"><span id="${id}" class="toggle ${on ? 'on' : ''} flex-none cursor-pointer"></span><span class="text-[13px] text-on-surface">${text}</span></div>`;
 
   let config = '';
-  if (w.type === 'fixos') {
+  if (!w.type) {
+    config = `<p class="text-[12px] text-on-surface-variant">Escolha uma das opções acima.</p>`;
+  } else if (w.type === 'fixos') {
     config = toggleRow('ed-notime', w.noTime, 'Sem horário específico')
       + (w.noTime ? '' : `<div id="ed-times" class="flex flex-wrap gap-2 mt-3"></div>`);
   } else if (w.type === 'intervalo') {
@@ -147,10 +153,10 @@ export function renderWhen() {
   const tolerancia = hasTimes ? group(lbl('Tolerância') + `<div class="flex items-center gap-2">
       <input id="ed-tolerance" type="number" min="0" value="${w.toleranceMin}" class="w-16 text-center ${fieldCls}">
       <span class="text-[13px] text-on-surface">min até marcar como atrasada</span></div>`) : '';
-  const dias = w.type === 'demanda' ? '' : group(lbl('Dias', `<button data-when-alldays class="tap text-[12px] font-semibold text-primary px-2 py-0.5 rounded">Todos</button>`)
+  const dias = w.type === 'demanda' ? '' : group(lbl('Dias' + REQ, `<button data-when-alldays class="tap text-[12px] font-semibold text-primary px-2 py-0.5 rounded">Todos os dias</button>`)
     + `<div class="grid grid-cols-7 gap-1.5">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => `<button data-when-day="${i}" class="wday-btn tap h-9 rounded-lg font-semibold text-[13px]">${d}</button>`).join('')}</div>`);
 
-  wrap.innerHTML = lbl('Quando preencher')
+  wrap.innerHTML = lbl('Quando preencher' + REQ)
     + `<div class="grid grid-cols-5 gap-1.5">${typeBtn('fixos', 'Fixos', 'schedule')}${typeBtn('intervalo', 'A cada', 'timelapse')}${typeBtn('vezes', 'Vezes', 'repeat')}${typeBtn('momentos', 'Momentos', 'flag')}${typeBtn('demanda', 'Demanda', 'bolt')}</div>
     <div class="mt-3">${config}</div>${horarios}${dias}`;
   const tw = $('ed-tol-wrap'); if (tw) tw.innerHTML = tolerancia; // fica embaixo do Local
@@ -179,17 +185,18 @@ export function renderWhen() {
   // dias: lista vazia = todos. Na tela, "todos" aparece com os 7 marcados; desmarcar um
   // deixa os outros 6. Não dá pra desmarcar o último (sem dia nenhum não faz sentido).
   function paintDays() {
-    const all = w.days.length === 0;
-    document.querySelectorAll('.wday-btn').forEach(b => { const i = +b.dataset.whenDay; const on = all || w.days.includes(i); b.className = 'wday-btn tap h-9 rounded-lg font-semibold text-[13px] ' + (on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'); });
+    // null = ainda não escolheu; [] = todos os dias
+    const all = Array.isArray(w.days) && w.days.length === 0;
+    document.querySelectorAll('.wday-btn').forEach(b => { const i = +b.dataset.whenDay; const on = all || (w.days || []).includes(i); b.className = 'wday-btn tap h-9 rounded-lg font-semibold text-[13px] ' + (on ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'); });
     const ad = document.querySelector('[data-when-alldays]'); if (ad) ad.classList.toggle('invisible', all);
   }
   const ad = document.querySelector('[data-when-alldays]'); if (ad) ad.onclick = () => { w.days = []; paintDays(); };
   document.querySelectorAll('.wday-btn').forEach(b => b.onclick = () => {
     const i = +b.dataset.whenDay;
-    const cur = w.days.length ? w.days.slice() : [0, 1, 2, 3, 4, 5, 6];
+    const cur = w.days === null ? [] : w.days.length ? w.days.slice() : [0, 1, 2, 3, 4, 5, 6];
     const k = cur.indexOf(i);
-    if (k >= 0) { if (cur.length === 1) return; cur.splice(k, 1); } else cur.push(i);
-    w.days = cur.length === 7 ? [] : cur;
+    if (k >= 0) cur.splice(k, 1); else cur.push(i);
+    w.days = cur.length === 7 ? [] : cur.length ? cur : null; // desmarcar o último volta a "não escolhido"
     paintDays();
   });
   paintDays();
@@ -449,8 +456,8 @@ export function openAddParam() { openParamTypePicker(-1); }
 function paramTypeBody(p) {
   if (p.type === 'numeric') return `
       <div class="grid grid-cols-2 gap-2">
-        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Mínimo</label><input data-pmin type="number" step="0.1" placeholder="0.5" value="${p.min || ''}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
-        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Máximo</label><input data-pmax type="number" step="0.1" placeholder="2.0" value="${p.max || ''}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Mínimo${REQ}</label><input data-pmin type="number" step="0.1" placeholder="0.5" value="${p.min || ''}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
+        <div><label class="mono text-[10px] uppercase text-on-surface-variant">Máximo${REQ}</label><input data-pmax type="number" step="0.1" placeholder="2.0" value="${p.max || ''}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
         <div><label class="mono text-[10px] uppercase text-on-surface-variant">Incremento (+/-)</label><input data-pstep type="number" step="0.1" min="0.01" placeholder="0.1" value="${p.step || 0.1}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
         <div><label class="mono text-[10px] uppercase text-on-surface-variant">Unidade</label><input data-punit placeholder="ppm" value="${esc(p.unit)}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2 mono text-[13px] border border-transparent focus:border-primary"></div>
       </div>`;
@@ -520,7 +527,7 @@ export function renderEditorParams() {
         ${window.__editorParams.length > 1 ? `<button data-del-param class="tap text-error flex-none">${icon('delete', 'text-[18px]')}</button>` : ''}
       </div>
     </div>
-    <div><label class="mono text-[10px] uppercase text-on-surface-variant">Título</label>
+    <div><label class="mono text-[10px] uppercase text-on-surface-variant">Título${REQ}</label>
       <input data-pname placeholder="Ex: Cloro Livre" value="${esc(p.name)}" class="w-full mt-1 bg-surface-container-low rounded-lg px-3 py-2.5 text-[14px] font-semibold text-on-surface border border-transparent focus:border-primary"></div>
     ${paramTypeBody(p)}
   </div>`;
@@ -591,6 +598,7 @@ export function syncEditorParams() {
 export function titleProblem() { return $('ed-title') && $('ed-title').value.trim() ? null : 'Dê um nome à planilha.'; }
 export function whenProblem() {
   syncWhen(); const w = window.__when;
+  if (!w.type) return 'Escolha quando preencher.';
   if (w.type === 'fixos' && !w.noTime && !window.__editorTimes.filter(Boolean).length) return 'Adicione ao menos um horário (ou ligue “Sem horário específico”).';
   if ((w.type === 'intervalo' || w.type === 'vezes') && usesWindow(whenSchedule(w)) && !w.useExp) {
     if (toMin(w.start) === null || toMin(w.end) === null) return 'Informe o horário de início e de fim.';
@@ -600,8 +608,10 @@ export function whenProblem() {
     if (!turnosDefinidos(unitTurnos())) return 'Defina o horário do expediente para usar início/fim do turno.';
     if (!w.moments.size) return 'Selecione ao menos um momento.';
   }
+  if (w.type !== 'demanda' && w.days === null) return 'Escolha os dias (ou toque em “Todos os dias”).';
   return null;
 }
+export function fillProblem() { return window.__fillMode ? null : 'Escolha quem preenche: “Basta um” ou “Cada pessoa”.'; }
 export function paramsProblem() {
   syncEditorParams();
   const ps = window.__editorParams;
@@ -614,7 +624,7 @@ export function paramsProblem() {
 }
 
 export async function saveFormEditor() {
-  const problem = titleProblem() || whenProblem() || paramsProblem();
+  const problem = titleProblem() || whenProblem() || fillProblem() || paramsProblem();
   if (problem) { toast(problem, 'err'); return; }
   const title = $('ed-title').value.trim();
   const w = window.__when;

@@ -9,7 +9,7 @@
 // recalculada a cada 250 ms (o alvo muda de tamanho quando as classes chegam).
 import { DB, currentUser, screen, params, getForm, getPac, unitTurnos } from './state.js';
 import { turnosDefinidos } from './schedule.js';
-import { titleProblem, whenProblem, paramsProblem } from './screens/formEditor.js';
+import { titleProblem, whenProblem, fillProblem, paramsProblem } from './screens/formEditor.js';
 import { esc } from './helpers.js';
 
 // exemplo de planilha de cada PAC, pro tutorial falar do PAC que a pessoa abriu
@@ -65,7 +65,9 @@ const STEPS = [
   { id: 'ed-title', screens: ['ge_form_editor'], target: '#ed-title', next: 'Próximo', ready: titleProblem,
     text: () => `Dê um nome à planilha. Ex.: “${example()[0]}”.` },
   { id: 'ed-when', screens: ['ge_form_editor'], target: '#ed-when-wrap', next: 'Próximo', ready: whenProblem,
-    text: 'Escolha <b>quando</b> preencher: horários fixos, a cada X horas, X vezes ao dia, no início/fim do turno ou sob demanda. Em <b>Fixos</b>, toque em <b>Adicionar horário</b> (ou ligue “Sem horário específico”).' },
+    text: 'Escolha <b>quando</b> preencher: horários fixos, a cada X horas, X vezes ao dia, no início/fim do turno ou sob demanda. Em <b>Fixos</b>, toque em <b>Adicionar horário</b> (ou ligue “Sem horário específico”). Depois marque os <b>dias</b>.' },
+  { id: 'ed-fill', screens: ['ge_form_editor'], target: '#ed-fill', next: 'Próximo', ready: fillProblem,
+    text: '<b>Quem preenche?</b> “Basta um” quando o registro é do local ou do processo (cloro, temperatura). “Cada pessoa” quando cada um registra o seu (saúde, uniforme).' },
   { id: 'ed-params', screens: ['ge_form_editor'], target: '#ed-params', next: 'Próximo', ready: paramsProblem,
     text: () => `O que o operador confere — ex.: ${example()[1]}. Dê um título e, em Mín/Máx, a faixa aceitável: fora dela vira <b>não conformidade</b> no painel.` },
   { id: 'ed-save', screens: ['ge_form_editor'], target: '[data-action="save-form"]',
