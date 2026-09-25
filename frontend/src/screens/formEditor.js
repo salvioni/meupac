@@ -279,7 +279,7 @@ export function openTimePicker(idx = -1) {
         <button data-time-ok ${!val || dup ? 'disabled' : ''} class="tap flex-1 rounded-xl py-3.5 font-semibold text-[14px] ${!val || dup ? 'bg-surface-container text-outline-variant' : 'bg-primary text-on-primary'}">${val ? (idx >= 0 ? `Salvar ${val}` : `Adicionar ${val}`) : 'Escolha a hora'}</button>
       </div>
     </div></div>`;
-    document.querySelectorAll('[data-pick-h]').forEach(b => b.onclick = () => { pick.h = +b.dataset.pickH; paint(); });
+    document.querySelectorAll('[data-pick-h]').forEach(b => b.onclick = () => { pick.h = +b.dataset.pickH; pick.m = 0; paint(); }); // hora nova começa em :00
     document.querySelectorAll('[data-pick-m]').forEach(b => b.onclick = () => { pick.m = +b.dataset.pickM; paint(); });
     const ok = document.querySelector('[data-time-ok]');
     if (ok) ok.onclick = () => {
