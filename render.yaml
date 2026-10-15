@@ -25,3 +25,27 @@ services:
       name: meupac-data
       mountPath: /var/data
       sizeGB: 1
+
+  # instância de demonstração (pra mostrar o app com login/senha de exemplo): plano
+  # grátis e SEM disco, de propósito — o banco vive no sistema de arquivos temporário,
+  # então a cada deploy ou quando o Render "acorda" o serviço ele volta zerado, com os
+  # dados da Serra Verde semeados de novo com a data do dia. Nada de dado real aqui.
+  - type: web
+    name: meupac-demo
+    runtime: node
+    plan: free
+    region: virginia
+    buildCommand: cd backend && npm ci
+    startCommand: cd backend && node src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: MEUPAC_SEED_DEMO
+        value: "1" # cria camila/joao/carlos/... com senha meupac123
+      - key: TZ
+        value: America/Sao_Paulo
+      - key: JWT_SECRET
+        generateValue: true
